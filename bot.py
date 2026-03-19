@@ -5,8 +5,8 @@ import requests, asyncio, os
 
 # --- Конфигурация ---
 TOKEN = os.environ.get("BOT_TOKEN")
-ONEC_API = "https://твой-домен.ру/hs/goszakupki/receive"
-ONEC_API_INN = "https://твой-домен.ру/hs/goszakupki/receiveINN"
+ONEC_API = "https://apps.itscloud.ru/00000276_3/hs/botapi/receive"
+ONEC_API_INN = "https://apps.itscloud.ru/00000276_3/hs/botapi/receiveINN"
 
 # Flask app для webhook
 app = Flask(__name__)
