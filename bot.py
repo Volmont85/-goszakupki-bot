@@ -1,4 +1,3 @@
-
 import os, logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -13,12 +12,12 @@ logger = logging.getLogger(__name__)
 application = Application.builder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Бот работает через Render!")
+    await update.message.reply_text("✅ Бот успешно запущен через Render!")
 
 application.add_handler(CommandHandler("start", start))
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting webhook server...")
+    logger.info("🚀 Starting webhook server…")
     application.run_webhook(
         listen="0.0.0.0",
         port=PORT,
