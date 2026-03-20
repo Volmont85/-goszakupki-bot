@@ -34,13 +34,13 @@ def post_to_1c(url, payload):
     """Отправляет POST-запрос к 1С и возвращает (dict|str)"""
     try:
         print(f"DEBUG → POST {url} payload={payload}")
-
-r = requests.post(
-    url,
-    json=payload,
-    timeout=15,
-    verify=VERIFY_SSL
-)
+        r = requests.post(
+            url,
+            json=payload,
+            #auth=HTTPBasicAuth(ONEC_LOGIN, ONEC_PASSWORD) if ONEC_LOGIN else None,
+            timeout=15,
+            verify=VERIFY_SSL
+        )
         print("DEBUG статус:", r.status_code)
         if r.status_code == 200:
             return r.json()
