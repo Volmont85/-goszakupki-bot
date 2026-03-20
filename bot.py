@@ -2,7 +2,6 @@ from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import requests, asyncio, os
-from requests.auth import HTTPBasicAuth
 
 print("==== Railway ENV ====")
 for k, v in os.environ.items():
@@ -17,7 +16,7 @@ TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 ONEC_API = os.environ.get("ONEC_API", "https://apps.itscloud.ru/00000276_3/hs/botapi/receive").strip()
 ONEC_API_INN = os.environ.get("ONEC_API_INN", "https://apps.itscloud.ru/00000276_3/hs/botapi/receiveINN").strip()
 
-# Логин и пароль для доступа (можно указать в Railway Variables)
+# Логин и пароль для доступа (укажи в Railway Variables)
 ONEC_LOGIN = os.environ.get("ONEC_LOGIN", "").strip()
 ONEC_PASSWORD = os.environ.get("ONEC_PASSWORD", "").strip()
 
@@ -26,29 +25,30 @@ VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() == "true"
 # --- Flask app ---
 app = Flask(__name__)
 
-# --- Telegram application ---
+# --- Telegram приложение ---
 application = Application.builder().token(TOKEN).build()
 
 # --- вспомогательная функция для запросов к 1С ---
 def post_to_1c(url, payload):
-    """Отправляет POST-запрос к 1С и возвращает (dict|str)"""
+    """Отправляет POST-запрос к 1С и возвращает dict"""
     try:
+        # ✅ добавляем логин/пароль в тело (если Basic Auth не работает)
+        if ONEC_LOGIN and ONEC_PASSWORD:
+            payload.update({"login": ONEC_LOGIN, "password": ONEC_PASSWORD})
+
         print(f"DEBUG → POST {url} payload={payload}")
-        r = requests.post(
-            url,
-            json=payload,
-            timeout=15,
-            verify=VERIFY_SSL
-        )
-        print("DEBUG статус:", r.status_code)
+        r = requests.post(url, json=payload, timeout=15, verify=VERIFY_SSL)
+        print("DEBUG статус:", r.status_code)
+
         if r.status_code == 200:
             return r.json()
         elif r.status_code == 401:
-            return {"status": "error", "message": "⛔ Ошибка авторизации на сервере 1С"}
+            return {"status": "error", "message": "⛔ Ошибка авторизации на сервере 1С (проверь логин/пароль и режим доступа)"}
         else:
-            return {"status": "error", "message": f"⚠️ 1С ответил кодом {r.status_code}: {r.text[:150]}"}
+            return {"status": "error", "message": f"⚠️ 1С ответил кодом {r.status_code}: {r.text[:150]}"}
+
     except requests.exceptions.Timeout:
-        return {"status": "error", "message": "⌛ Сервер 1С не ответил за таймаут 15 с."}
+        return {"status": "error", "message": "⌛ Сервер 1С не ответил за таймаут 15 c."}
     except requests.exceptions.ConnectionError as e:
         return {"status": "error", "message": f"🌐 Ошибка соединения: {e}"}
     except requests.exceptions.SSLError:
@@ -59,25 +59,23 @@ def post_to_1c(url, payload):
 # --- команды ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Здравствуйте! Отправьте номер закупки, чтобы начать.")
-    await update.message.reply_text("ℹ️ Пример: 12345")
+    await update.message.reply_text("ℹ️ Пример: 0161150001726000006")
 
+# --- состояние пользователей ---
 user_states = {}
 
-# --- обработка любого текста ---
+# --- обработка сообщений ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
-    # Если ждём ИНН
     if user_states.get(user_id) == "waiting_inn":
         data = post_to_1c(ONEC_API_INN, {"ИНН": text})
-        await update.message.reply_text(data.get("message", "⚠️ Ошибка запроса к 1С"))
+        await update.message.reply_text(data.get("message", "⚠️ Ошибка запроса к 1С"))
         user_states.pop(user_id, None)
         return
 
-    # Иначе номер закупки
     data = post_to_1c(ONEC_API, {"TelegramID": str(user_id), "НомерЗакупки": text})
-
     status = data.get("status")
     msg = data.get("message", "Нет ответа")
 
@@ -89,7 +87,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(msg)
 
-# --- регистрация команд и обработчиков ---
+# --- регистрируем обработчики ---
 application.add_handler(CommandHandler("start", start))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
@@ -104,11 +102,12 @@ def webhook():
 def home():
     return "Bot is running!", 200
 
-# --- запуск вебхука ---
+# --- запуск на Railway ---
 if __name__ == "__main__":
     HOST = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
     if not HOST:
-        print("⚠️ Переменная RAILWAY_PUBLIC_DOMAIN не установлена — добавьте её в Railway → Variables.")
+        print("⚠️ Добавьте переменную RAILWAY_PUBLIC_DOMAIN в Railway → Variables")
+
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
