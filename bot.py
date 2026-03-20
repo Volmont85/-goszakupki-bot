@@ -74,5 +74,5 @@ if __name__ == "__main__":
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
         url_path=TOKEN,
-        webhook_url=f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/{TOKEN}"
+        webhook_url=f"https://{os.environ.get('RAILWAY_PUBLIC_DOMAIN')}/{TOKEN}"
     )
