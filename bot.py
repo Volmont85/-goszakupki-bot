@@ -4,7 +4,7 @@ from telegram.ext import Application, MessageHandler, CommandHandler, filters, C
 import requests, asyncio, os
 
 # --- Конфигурация ---
-TOKEN = os.environ.get("BOT_TOKEN")
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ONEC_API = "https://apps.itscloud.ru/00000276_3//hs/botapi/receive"
 ONEC_API_INN = "https://apps.itscloud.ru/00000276_3//hs/botapi/receiveINN"
 
