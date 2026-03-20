@@ -19,8 +19,7 @@ ONEC_API_INN = os.environ.get("ONEC_API_INN", "https://apps.itscloud.ru/00000276
 # Логин и пароль для доступа (укажи в Railway Variables)
 ONEC_LOGIN = os.environ.get("ONEC_LOGIN", "").strip()
 ONEC_PASSWORD = os.environ.get("ONEC_PASSWORD", "").strip()
-print(ONEC_LOGIN)
-print(ONEC_PASSWORD)
+
 VERIFY_SSL = os.environ.get("VERIFY_SSL", "true").lower() == "true"
 
 # --- Flask app ---
