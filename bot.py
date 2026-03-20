@@ -9,7 +9,7 @@ for k, v in os.environ.items():
         print(k, "=", v)
 print("======================")
 # --- Конфигурация ---
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TOKEN = "8735864098:AAGrTq09RAi19kUj892Hu0rX7Z0nLy_MHvo"#os.environ.get("TELEGRAM_BOT_TOKEN")
 ONEC_API = "https://apps.itscloud.ru/00000276_3//hs/botapi/receive"
 ONEC_API_INN = "https://apps.itscloud.ru/00000276_3//hs/botapi/receiveINN"
 
