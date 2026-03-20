@@ -30,14 +30,16 @@ application = Application.builder().token(TOKEN).build()
 
 # --- вспомогательная функция для запросов к 1С ---
 def post_to_1c(url, payload):
-    """Отправляет POST-запрос к 1С и возвращает dict"""
+    """Отправляет POST‑запрос к 1С и возвращает dict"""
     try:
-        # ✅ добавляем логин/пароль в тело (если Basic Auth не работает)
-        if ONEC_LOGIN and ONEC_PASSWORD:
-            payload.update({"login": ONEC_LOGIN, "password": ONEC_PASSWORD})
-
         print(f"DEBUG → POST {url} payload={payload}")
-        r = requests.post(url, json=payload, timeout=15, verify=VERIFY_SSL)
+
+        # ✅ добавляем basic auth
+        auth = None
+        if ONEC_LOGIN and ONEC_PASSWORD:
+            auth = (ONEC_LOGIN, ONEC_PASSWORD)
+
+        r = requests.post(url, json=payload, timeout=15, verify=VERIFY_SSL, auth=auth)
         print("DEBUG статус:", r.status_code)
 
         if r.status_code == 200:
