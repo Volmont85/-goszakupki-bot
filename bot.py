@@ -37,7 +37,6 @@ def post_to_1c(url, payload):
         r = requests.post(
             url,
             json=payload,
-            #auth=HTTPBasicAuth(ONEC_LOGIN, ONEC_PASSWORD) if ONEC_LOGIN else None,
             timeout=15,
             verify=VERIFY_SSL
         )
