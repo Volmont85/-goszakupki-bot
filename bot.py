@@ -3,6 +3,11 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
 import requests, asyncio, os
 
+print("==== Railway ENV ====")
+for k, v in os.environ.items():
+    if "BOT" in k or "RAILWAY" in k:
+        print(k, "=", v)
+print("======================")
 # --- Конфигурация ---
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ONEC_API = "https://apps.itscloud.ru/00000276_3//hs/botapi/receive"
