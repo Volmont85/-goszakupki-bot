@@ -50,9 +50,16 @@ async def webhook():
     return "ok", 200
 
 if __name__ == "__main__":
-    # Запуск webhook
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.getenv("PORT", 8080)),
-        url_path=BOT_TOKEN
-    )
+    # URL твоего Railway‑проекта
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+
+    if WEBHOOK_URL.startswith("https://"):
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.getenv("PORT", 8080)),
+            url_path=BOT_TOKEN,
+            webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"  # передаем полный https‑адрес
+        )
+    else:
+        # fallback: polling для отладки без HTTPS
+        application.run_polling()
