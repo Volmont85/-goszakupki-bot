@@ -1,55 +1,82 @@
-import os, requests, logging
+import os
+import logging
+import requests
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# Логи для Railway
-logging.basicConfig(level=logging.INFO)
+# --- Настройки логов ---
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 
-# === Конфигурация ===
-BOT_TOKEN = os.getenv("BOT_TOKEN", "<ТОКЕН_БОТА>")
+# --- Переменные окружения ---
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://my-bot.up.railway.app
 ONEC_URL = os.getenv("ONEC_URL", "https://apps.itscloud.ru/00000276_3/hs/botapi/ping")
 ONEC_USER = os.getenv("ONEC_USER", "user")
 ONEC_PASS = os.getenv("ONEC_PASS", "pass")
 
-# Приложение Telegram
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN не задан в переменных окружения Railway!")
+
+# --- Создание Telegram-приложения ---
 application = Application.builder().token(BOT_TOKEN).build()
 
-# === Команды ===
+# =========================================================
+# 📌 Команды Telegram
+# =========================================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ответ на /start"""
+    await update.message.reply_text(
+        "👋 Привет!\n"
+        "Бот запущен и готов к работе.\n"
+        "Используй /test — проверим связь с 1С."
+    )
+
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Отправляю запрос в 1С...")
+    """Отправка тестового запроса в 1С"""
+    chat_id = update.effective_chat.id
+    await update.message.reply_text("📡 Отправляю запрос в 1С...")
+
     try:
         response = requests.post(
             ONEC_URL,
-            json={"TelegramID": update.effective_chat.id},
+            json={"TelegramID": chat_id},
             auth=(ONEC_USER, ONEC_PASS),
             timeout=20
         )
-        text = response.text
 
-        # Обрезаем слишком длинный ответ, чтобы не упасть с ошибкой
+        text = response.text.strip()
+
+        # Если 1С возвращает слишком длинный ответ — обрезаем
         if len(text) > 4000:
-            text = text[:3990] + "\n\n... (обрезано)"
+            text = text[:3990] + "\n\n... (обрезано, ответ слишком длинный)"
 
-        await update.message.reply_text(f"Ответ от 1С:\n{text}")
+        await update.message.reply_text(f"✅ Ответ от 1С:\n{text}")
 
     except Exception as e:
-        # Любые внутренние ошибки выводим коротко
         err = str(e)
         if len(err) > 3000:
             err = err[:3000] + "..."
-        await update.message.reply_text(f"❌ Ошибка при обращении к 1С: {err}")
+        await update.message.reply_text(f"❌ Ошибка при обращении к 1С:\n{err}")
 
-# Регистрируем команды
+# =========================================================
+# 🔧 Регистрация команд
+# =========================================================
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("test", test_command))
 
-# === Flask ===
+# =========================================================
+# 🧩 Flask для webhook
+# =========================================================
 app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def home():
-    return "✅ Railway бот запущен"
+    return "✅ Railway бот запущен и слушает Telegram."
 
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 async def webhook():
@@ -57,17 +84,20 @@ async def webhook():
     await application.update_queue.put(update)
     return "ok", 200
 
+# =========================================================
+# 🚀 Точка входа
+# =========================================================
 if __name__ == "__main__":
-    # URL твоего Railway‑проекта
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+    port = int(os.getenv("PORT", 8080))
 
-    if WEBHOOK_URL.startswith("https://"):
+    if WEBHOOK_URL and WEBHOOK_URL.startswith("https://"):
+        logging.info(f"Запуск webhook на {WEBHOOK_URL}/{BOT_TOKEN}")
         application.run_webhook(
             listen="0.0.0.0",
-            port=int(os.getenv("PORT", 8080)),
+            port=port,
             url_path=BOT_TOKEN,
-            webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"  # передаем полный https‑адрес
+            webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}"
         )
     else:
-        # fallback: polling для отладки без HTTPS
+        logging.warning("WEBHOOK_URL не задан или без HTTPS — запуск в режиме polling.")
         application.run_polling()
