@@ -16,9 +16,6 @@ ONEC_PASS = os.getenv("ONEC_PASS", "pass")
 application = Application.builder().token(BOT_TOKEN).build()
 
 # === Команды ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привет! Используй /test — проверим связь с 1С!")
-
 async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Отправляю запрос в 1С...")
     try:
@@ -28,9 +25,20 @@ async def test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             auth=(ONEC_USER, ONEC_PASS),
             timeout=20
         )
-        await update.message.reply_text(f"Ответ от 1С: {response.text}")
+        text = response.text
+
+        # Обрезаем слишком длинный ответ, чтобы не упасть с ошибкой
+        if len(text) > 4000:
+            text = text[:3990] + "\n\n... (обрезано)"
+
+        await update.message.reply_text(f"Ответ от 1С:\n{text}")
+
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка при обращении к 1С: {e}")
+        # Любые внутренние ошибки выводим коротко
+        err = str(e)
+        if len(err) > 3000:
+            err = err[:3000] + "..."
+        await update.message.reply_text(f"❌ Ошибка при обращении к 1С: {err}")
 
 # Регистрируем команды
 application.add_handler(CommandHandler("start", start))
