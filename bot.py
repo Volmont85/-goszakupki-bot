@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 
 # === Конфигурация ===
 BOT_TOKEN = os.getenv("BOT_TOKEN", "<ТОКЕН_БОТА>")
-ONEC_URL = os.getenv("ONEC_URL", "https://yourcompany.itscloud.ru/testservice")
+ONEC_URL = os.getenv("ONEC_URL", "https://apps.itscloud.ru/00000276_3/hs/botapi/ping")
 ONEC_USER = os.getenv("ONEC_USER", "user")
 ONEC_PASS = os.getenv("ONEC_PASS", "pass")
 
