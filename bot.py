@@ -9,8 +9,8 @@ app = Flask(__name__)
 # === 🔧 Настройки ===
 BOT_TOKEN = os.getenv("BOT_TOKEN", "<ТОКЕН_БОТА>")
 ONEC_URL = os.getenv("ONEC_URL", "https://apps.itscloud.ru/00000276_3/hs/botapi/ping")  # URL твоего HTTP‑сервиса 1С
-ONEC_LOGIN = os.getenv("ONEC_LOGIN", "botuser")  # логин 1С‑пользователя
-ONEC_PASSWORD = os.getenv("ONEC_PASSWORD", "botpass")  # пароль
+ONEC_USER = os.getenv("ONEC_LOGIN", "botuser")  # логин 1С‑пользователя
+ONEC_PASS = os.getenv("ONEC_PASSWORD", "botpass")  # пароль
 
 bot = Bot(token=BOT_TOKEN)
 
