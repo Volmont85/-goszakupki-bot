@@ -1,3 +1,1 @@
-python-telegram-bot[webhooks]==20.8
-Flask
-requests
+pip install python-telegram-bot>=20.0,<22.0 flask requests
