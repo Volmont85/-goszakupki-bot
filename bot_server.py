@@ -226,7 +226,9 @@ async def api_error(request: Request, api_key: str = Header(None)):
 # ------------------------------#
 def main():
     import uvicorn
-    loop = asyncio.get_event_loop()
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
     loop.create_task(dp.start_polling(bot))
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
 
