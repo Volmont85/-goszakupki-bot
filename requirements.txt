@@ -1,5 +1,6 @@
 setuptools==70.0.0
 aiogram==3.6.0
 asyncpg
-aioredis
+redis==5.0.3
 python-dotenv
+setuptools
