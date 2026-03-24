@@ -2,7 +2,8 @@ import asyncio, os, re, json
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 import asyncpg
-import aioredis
+import redis.asyncio as aioredis
+
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 PG_DSN = os.getenv("POSTGRES_URL")
