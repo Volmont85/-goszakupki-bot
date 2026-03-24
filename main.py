@@ -55,7 +55,7 @@ async def any_text(msg: types.Message):
     # другие ветви: confirm_use_company, choose_company, await_company_name, …
 
     await pg.close()
-    await rd.close()
+    await rd.aclose()
 
 async def poll_outbox():
     pg = await asyncpg.connect(PG_DSN)
