@@ -169,7 +169,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             await session.commit()
 
             await msg.answer(
-                f"✅ ИНН {inn} принадлежит компании:\n<b>{company}</b>\n"
+                f"✅ ИНН {inn} принадлежит компании:\n{company}\n"
                 "Записал, продолжаем."
             )
             await state.update_data(inn=inn, company_name=company)
@@ -202,7 +202,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
         await session.commit()
 
     await msg.answer(
-        f"✅ Компания <b>{company_name}</b> сохранена для ИНН {inn}.\n"
+        f"✅ Компания {company_name} сохранена для ИНН {inn}.\n"
         "Теперь можно продолжать работу."
     )
     await state.update_data(company_name=company_name)
@@ -224,6 +224,17 @@ async def confirm_one(msg: Message, state: FSMContext):
     else:
         await msg.answer("Пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
+
+@dp.message(PurchaseStates.CONFIRM_ONE_AUTO)
+async def confirm_one(msg: Message, state: FSMContext):
+        async with SessionLocal() as session:
+            await session.execute(text("""
+                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
+            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
+            await session.commit()
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+        await state.clear()
+    
 
 @dp.message(PurchaseStates.CHOOSE_COMPANY)
 async def choose_company(msg: Message, state: FSMContext):
