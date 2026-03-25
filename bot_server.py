@@ -516,6 +516,25 @@ async def main():
     # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
     await dp.start_polling(bot)
 
+import os
+import socket
+import logging
+import uvicorn
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}
+
 if __name__ == "__main__":
-    # Современный запуск без get_event_loop()
-    asyncio.run(main())
+    logging.basicConfig(level=logging.INFO)
+    host = os.getenv("SERVER_HOST", "0.0.0.0")
+    port = int(os.getenv("SERVER_PORT", "8000"))
+    ip = socket.gethostbyname(socket.gethostname())
+
+    logging.info(f"🚀 FastAPI starting -> http://{ip}:{port}")
+    logging.info(f"📡 For 1C: use http://{host}:{port}/api/inbox")
+
+    uvicorn.run("bot_server:app", host=host, port=port)
