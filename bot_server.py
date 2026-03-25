@@ -284,7 +284,7 @@ async def api_inbox(api_key: str = Header(None)):
     return data
 
 @app.post("/api/result")
-async def api_result(request: Request, api_key: str = Header(None)):
+async def api_result(request: Request, api_key: str = Header(None)): 
     await check_token(api_key)
     data = await request.json()
     async with SessionLocal() as session:
