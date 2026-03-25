@@ -42,7 +42,7 @@ class PurchaseStates(StatesGroup):
     WAIT_NAME = State()
     CHOOSE_COMPANY = State()
     CONFIRM_ONE = State()
-    CONFIRM_AUTO = State()
+
 
 # ------------------------------#
 # Helpers
@@ -174,9 +174,20 @@ async def handle_inn(msg: Message, state: FSMContext):
                 "Записал, продолжаем."
             )
             await state.update_data(inn=inn, company_name=company)
-            await state.set_state(PurchaseStates.CONFIRM_AUTO)
-            data = await state.get_data()
-            await confirm_auto(msg, state, data)
+await session.execute(text("""
+            UPDATE inbox
+            SET inn = :inn, company_name = :nm
+            WHERE telegram_id = :tg AND zakupka_num = :znum
+        """), {
+            "inn": data["inn"],
+            "nm": data["company_name"],
+            "tg": msg.from_user.id,
+            "znum": data["zakupka"]
+        })
+        await session.commit()
+
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await state.clear()
         else:
             # не нашли — просим название вручную
             await msg.answer(
@@ -209,9 +220,20 @@ async def handle_company_name(msg: Message, state: FSMContext):
         "Теперь можно продолжать работу."
     )
     await state.update_data(company_name=company_name)
-    await state.set_state(PurchaseStates.CONFIRM_AUTO)
-    data = await state.get_data()
-    await confirm_auto(msg, state, data)
+wait session.execute(text("""
+            UPDATE inbox
+            SET inn = :inn, company_name = :nm
+            WHERE telegram_id = :tg AND zakupka_num = :znum
+        """), {
+            "inn": data["inn"],
+            "nm": data["company_name"],
+            "tg": msg.from_user.id,
+            "znum": data["zakupka"]
+        })
+        await session.commit()
+
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await state.clear()
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
@@ -229,24 +251,6 @@ async def confirm_one(msg: Message, state: FSMContext):
     else:
         await msg.answer("Пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
-
-@dp.message(PurchaseStates.CONFIRM_AUTO)
-async def confirm_auto(msg: Message, state: FSMContext):
-    async with SessionLocal() as session:
-        await session.execute(text("""
-            UPDATE inbox
-            SET inn = :inn, company_name = :nm
-            WHERE telegram_id = :tg AND zakupka_num = :znum
-        """), {
-            "inn": data["inn"],
-            "nm": data["company_name"],
-            "tg": msg.from_user.id,
-            "znum": data["zakupka"]
-        })
-        await session.commit()
-
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
-    await state.clear()
     
 
 @dp.message(PurchaseStates.CHOOSE_COMPANY)
