@@ -279,39 +279,43 @@ async def choose_company(msg: Message, state: FSMContext):
     text_inp = msg.text.strip()
 
     # --- определяем ИНН и название компании ---
-if text_inp.isdigit() and len(text_inp) in (10, 12):
-    inn = text_inp
-    async with SessionLocal() as session:
-        res = await session.execute(
-            text("SELECT company_name FROM TelegramID WHERE inn=:i"),
-            {"i": inn},
-        )
-        row = res.fetchone()
-    if row:
-        name = row[0]
+    if text_inp.isdigit() and len(text_inp) in (10, 12):
+        # если введён ИНН
+        inn = text_inp
+        async with SessionLocal() as session:
+            res = await session.execute(
+                text("SELECT company_name FROM TelegramID WHERE inn = :i"),
+                {"i": inn},
+            )
+            row = res.fetchone()
+        if row:
+            name = row[0]
+        else:
+            await state.update_data(inn=inn)
+            await state.set_state(PurchaseStates.WAIT_INN)
+            await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
+            return
+
+    elif text_inp.isdigit():
+        # если введено число — это индекс компании в списке
+        idx = int(text_inp) - 1
+        if idx < 0 or idx >= len(data["companies"]):
+            await msg.answer("Ответ неверный, пожалуйста, повтори номер нужной фирмы.")
+            return
+        inn, name = data["companies"][idx]
+
     else:
-        await state.update_data(inn=inn)
-        await state.set_state(PurchaseStates.WAIT_INN)
-        await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
+        await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
         return
-
-elif text_inp.isdigit():  # потом проверяем, не номер ли это из списка компаний
-    idx = int(text_inp) - 1
-    if idx < 0 or idx >= len(data["companies"]):
-        await msg.answer("Ответ неверный, пожалуйста, повтори номер нужной фирмы.")
-        return
-    inn, name = data["companies"][idx]
-
-else:
-    await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
-    return
 
     # --- Проверяем, добавлялась ли закупка ранее ---
     async with SessionLocal() as session:
         res = await session.execute(
             text("""
-                SELECT 1 FROM inbox
-                WHERE inn = :inn AND zakupka_num = :znum
+                SELECT 1
+                FROM inbox
+                WHERE inn = :inn
+                  AND zakupka_num = :znum
             """),
             {"inn": inn, "znum": data["zakupka"]},
         )
@@ -343,10 +347,11 @@ else:
         )
         await session.commit()
 
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
-                     "Для добавления новой закупки нажми /start")
+    await msg.answer(
+        "✅ Заявка сохранена и передана на обработку в 1С.\n"
+        "Для добавления новой закупки нажми /start"
+    )
     await state.clear()
-
 
 # --- хэндлер подтверждения удаления ---
 @dp.message(PurchaseStates.CONFIRM_DELETE)
