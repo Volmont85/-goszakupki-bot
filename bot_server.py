@@ -293,7 +293,7 @@ async def choose_company(msg: Message, state: FSMContext):
         else:
             await state.update_data(inn=inn)
             await state.set_state(PurchaseStates.WAIT_INN)
-            await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
+            #await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
             return
 
     elif text_inp.isdigit():
