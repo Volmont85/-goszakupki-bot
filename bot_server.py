@@ -525,14 +525,24 @@ from fastapi import FastAPI
 app = FastAPI()
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = Bot(token=TOKEN)
+bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
 @app.post("/webhook")
-async def webhook(request: Request):
-    update = types.Update.model_validate(await request.json())
-    await dp.feed_update(bot, update)
-    return {"ok": True}
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        update = types.Update.model_validate(data)
+        await dp.feed_update(bot, update)
+        return {"ok": True}
+    except Exception as e:
+        # Логируем ошибку, чтобы увидеть её в Railway
+        print("⚠️ Webhook error:", e)
+        return {"ok": False}
+
+@app.get("/ping")
+async def ping():
+    return {"status": "alive"}
 
 @app.get("/ping")
 async def ping():
