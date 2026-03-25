@@ -173,7 +173,7 @@ async def handle_inn(msg: Message, state: FSMContext):
                 "Записал, продолжаем."
             )
             await state.update_data(inn=inn, company_name=company)
-            await state.set_state(PurchaseStates.CONFIRM_ONE)
+            await state.set_state(PurchaseStates.CONFIRM_ONE_AUTO)
         else:
             # не нашли — просим название вручную
             await msg.answer(
@@ -206,7 +206,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
         "Теперь можно продолжать работу."
     )
     await state.update_data(company_name=company_name)
-    await state.set_state(PurchaseStates.CONFIRM_ONE)
+    await state.set_state(PurchaseStates.CONFIRM_ONE_AUTO)
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
