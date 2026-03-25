@@ -208,7 +208,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             "Записал, продолжаем."
         )
         await state.update_data(inn=inn, company_name=company)
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                          "Для добавления новой закупки нажми /start")
         await state.clear()
 
@@ -249,7 +249,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
     await session.commit()
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                      "Для добавления новой закупки нажми /start")
     await state.clear()
 
@@ -265,7 +265,7 @@ async def confirm_one(msg: Message, state: FSMContext):
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
             await session.commit()
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                          "Для добавления новой закупки нажми /start")
         await state.clear()
     else:
@@ -279,32 +279,32 @@ async def choose_company(msg: Message, state: FSMContext):
     text_inp = msg.text.strip()
 
     # --- определяем ИНН и название компании ---
-    if text_inp.isdigit():
-        idx = int(text_inp) - 1
-        if idx < 0 or idx >= len(data["companies"]):
-            await msg.answer("Ответ неверный, пожалуйста, повтори номер нужной фирмы.")
-            return
-        inn, name = data["companies"][idx]
-
-    elif text_inp.isdigit() and len(text_inp) in (11, 19): #validate_inn(text_inp):
-        inn = text_inp
-        async with SessionLocal() as session:
-            res = await session.execute(
-                text("SELECT company_name FROM TelegramID WHERE inn=:i"),
-                {"i": inn},
-            )
-            row = res.fetchone()
-        if row:
-            name = row[0]
-        else:
-            await state.update_data(inn=inn)
-            await state.set_state(PurchaseStates.WAIT_INN)
-            await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
-            return
-
+    if text_inp.isdigit() and len(text_inp) in (10, 12):  # сначала проверяем ИНН
+    inn = text_inp
+    async with SessionLocal() as session:
+        res = await session.execute(
+            text("SELECT company_name FROM TelegramID WHERE inn=:i"),
+            {"i": inn},
+        )
+        row = res.fetchone()
+    if row:
+        name = row[0]
     else:
-        await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
+        await state.update_data(inn=inn)
+        await state.set_state(PurchaseStates.WAIT_INN)
+        await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
         return
+
+elif text_inp.isdigit():  # потом проверяем, не номер ли это из списка компаний
+    idx = int(text_inp) - 1
+    if idx < 0 or idx >= len(data["companies"]):
+        await msg.answer("Ответ неверный, пожалуйста, повтори номер нужной фирмы.")
+        return
+    inn, name = data["companies"][idx]
+
+else:
+    await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
+    return
 
     # --- Проверяем, добавлялась ли закупка ранее ---
     async with SessionLocal() as session:
@@ -343,7 +343,7 @@ async def choose_company(msg: Message, state: FSMContext):
         )
         await session.commit()
 
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                      "Для добавления новой закупки нажми /start")
     await state.clear()
 
@@ -366,11 +366,11 @@ async def confirm_delete(msg: Message, state: FSMContext):
             )
             await session.commit()
 
-        await msg.answer("✅ Закупка помечена как 'отказались'."
+        await msg.answer("✅ Закупка помечена как 'отказались'.\n"
                          "Для добавления новой закупки нажми /start")
         await state.clear()
     else:
-        await msg.answer("Ок, ничего не изменил."
+        await msg.answer("Ок, ничего не изменил.\n"
                         "Для добавления новой закупки нажми /start")
         await state.clear()
 
@@ -408,8 +408,8 @@ async def api_result(request: Request, api_key: str = Header(None)):
         row = res.fetchone()
     if row:
         tg = row[0]
-        text_msg = "✅ Заявка обработана в 1С. Для добавления новой закупки нажми /start" if data.get(
-            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки. Для добавления новой закупки нажми /start"
+        text_msg = "✅ Заявка обработана в 1С. \nДля добавления новой закупки нажми /start" if data.get(
+            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки. \nДля добавления новой закупки нажми /start"
         await bot.send_message(tg, text_msg)
     return {"ok": True}
 
