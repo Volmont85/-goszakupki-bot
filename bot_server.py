@@ -279,7 +279,7 @@ async def choose_company(msg: Message, state: FSMContext):
     text_inp = msg.text.strip()
 
     # --- определяем ИНН и название компании ---
-    if text_inp.isdigit() and len(text_inp) in (10, 12):  # сначала проверяем ИНН
+if text_inp.isdigit() and len(text_inp) in (10, 12):
     inn = text_inp
     async with SessionLocal() as session:
         res = await session.execute(
