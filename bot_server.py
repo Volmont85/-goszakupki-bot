@@ -165,30 +165,40 @@ async def handle_inn(msg: Message, state: FSMContext):
     if company:
         # нашли компанию — сохраняем в собственную таблицу
         async with SessionLocal() as session:
-            await session.execute(
-                text("""
-                    INSERT INTO TelegramID (telegram_id, inn, company_name)
-                    VALUES (:tg, :inn, :name)
-                    ON CONFLICT (telegram_id, inn) DO NOTHING
-                """),
-                {"tg": msg.from_user.id, "inn": inn, "name": company},
-            )
-            await session.execute(
-                text("""
-                    UPDATE inbox
-                    SET inn = :inn,
-                        company_name = :nm
-                    WHERE telegram_id = :tg
-                      AND zakupka_num = :znum
-                """),
-                {
-                    "inn": inn,
-                    "nm": company,
-                    "tg": msg.from_user.id,
-                    "znum": data.get("zakupka"),
-                },
-            )
-            await session.commit()
+    res = await session.execute(
+        text("""
+            SELECT 1 FROM TelegramID
+            WHERE telegram_id = :tg AND inn = :inn
+        """),
+        {"tg": msg.from_user.id, "inn": inn},
+    )
+    exists = res.scalar()
+
+    if not exists:
+        await session.execute(
+            text("""
+                INSERT INTO TelegramID (telegram_id, inn, company_name)
+                VALUES (:tg, :inn, :name)
+            """),
+            {"tg": msg.from_user.id, "inn": inn, "name": company},
+        )
+
+    await session.execute(
+        text("""
+            UPDATE inbox
+            SET inn = :inn,
+                company_name = :nm
+            WHERE telegram_id = :tg
+              AND zakupka_num = :znum
+        """),
+        {
+            "inn": inn,
+            "nm": company,
+            "tg": msg.from_user.id,
+            "znum": data.get("zakupka"),
+        },
+    )
+    await session.commit()
 
         await msg.answer(
             f"✅ ИНН {inn} принадлежит компании:\n{company}\n"
