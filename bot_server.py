@@ -283,7 +283,7 @@ async def choose_company(msg: Message, state: FSMContext):
             return
         inn, name = data["companies"][idx]
 
-    elif validate_inn(text_inp):
+    elif text_inp.isdigit() and len(text_inp) in (11, 19): #validate_inn(text_inp):
         inn = text_inp
         async with SessionLocal() as session:
             res = await session.execute(
