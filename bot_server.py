@@ -160,39 +160,51 @@ async def handle_inn(msg: Message, state: FSMContext):
         return
 
     company = await get_company_name_by_inn(inn)
+    data = await state.get_data()   # <— добавлено: извлекаем FSM‑данные
 
-    async with SessionLocal() as session:
-        if company:
-            # нашли сразу — сохраняем
+    if company:
+        # нашли компанию — сохраняем в собственную таблицу
+        async with SessionLocal() as session:
             await session.execute(
-                text(
-                    "INSERT INTO TelegramID (telegram_id, inn, company_name) "
-                    "VALUES (:tg, :inn, :name)"
-                ),
+                text("""
+                    INSERT INTO TelegramID (telegram_id, inn, company_name)
+                    VALUES (:tg, :inn, :name)
+                    ON CONFLICT (telegram_id, inn) DO NOTHING
+                """),
                 {"tg": msg.from_user.id, "inn": inn, "name": company},
             )
+            await session.execute(
+                text("""
+                    UPDATE inbox
+                    SET inn = :inn,
+                        company_name = :nm
+                    WHERE telegram_id = :tg
+                      AND zakupka_num = :znum
+                """),
+                {
+                    "inn": inn,
+                    "nm": company,
+                    "tg": msg.from_user.id,
+                    "znum": data.get("zakupka"),
+                },
+            )
             await session.commit()
 
-            await msg.answer(
-                f"✅ ИНН {inn} принадлежит компании:\n{company}\n"
-                "Записал, продолжаем."
-            )
-            await state.update_data(inn=inn, company_name=company)
-            async with SessionLocal() as session:
-                await session.execute(text("""
-                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
-            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
-            await session.commit()
-            await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
-            await state.clear()
-        else:
-            # не нашли — просим название вручную
-            await msg.answer(
-                "❗ Не удалось найти компанию по ИНН.\n"
-                "Пришли полное название компании (как в ЕГРЮЛ):"
-            )
-            await state.update_data(inn=inn)
-            await state.set_state(PurchaseStates.WAIT_NAME)
+        await msg.answer(
+            f"✅ ИНН {inn} принадлежит компании:\n{company}\n"
+            "Записал, продолжаем."
+        )
+        await state.update_data(inn=inn, company_name=company)
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+        await state.clear()
+    else:
+        # не нашли — просим название вручную
+        await msg.answer(
+            "❗ Не удалось найти компанию по ИНН.\n"
+            "Пришли полное название компании (как в ЕГРЮЛ):"
+        )
+        await state.update_data(inn=inn)
+        await state.set_state(PurchaseStates.WAIT_NAME)
 
 
 # --- этап 3: если не нашли по ИНН, пользователь вводит название сам ---
