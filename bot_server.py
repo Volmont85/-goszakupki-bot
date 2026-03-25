@@ -157,7 +157,7 @@ async def handle_zakupka(msg: Message, state: FSMContext):
 async def handle_inn(msg: Message, state: FSMContext):
     inn = msg.text.strip()
     if not validate_inn(inn):
-        await msg.answer("Проверь ИНН — должно быть 10 или 12 цифр!")
+        await msg.answer("⚠️ Проверь ИНН — должно быть 10 или 12 цифр!")
         return
 
     company = await get_company_name_by_inn(inn)
@@ -215,7 +215,7 @@ async def handle_inn(msg: Message, state: FSMContext):
     else:
         # не нашли — просим название вручную
         await msg.answer(
-            "❗ Не удалось найти компанию по ИНН.\n"
+            "⚠️ Не удалось найти компанию по ИНН.\n"
             "Пришли полное название компании (как в ЕГРЮЛ):"
         )
         await state.update_data(inn=inn)
@@ -293,7 +293,7 @@ async def choose_company(msg: Message, state: FSMContext):
         else:
             await state.update_data(inn=inn)
             await state.set_state(PurchaseStates.WAIT_INN)
-            #await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
+            #await msg.answer("⚠️ Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
             return
 
     elif text_inp.isdigit():
@@ -305,7 +305,7 @@ async def choose_company(msg: Message, state: FSMContext):
         inn, name = data["companies"][idx]
 
     else:
-        await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
+        await msg.answer("⚠️ Ответ неверный, введи номер фирмы или ИНН.")
         return
 
     # --- Проверяем, добавлялась ли закупка ранее ---
@@ -384,51 +384,107 @@ async def confirm_delete(msg: Message, state: FSMContext):
 # ------------------------------#
 
 
+from fastapi import FastAPI, Header, HTTPException, Request
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import text
+from datetime import datetime, timedelta
+import asyncio
+
+app = FastAPI()
+
+# --------------------------------
+# Настройки
+# --------------------------------
+API_KEY = "Jf3qKrL7vT9xBz8sWp2n"
+DB_URL = "postgresql+asyncpg://user:password@host/dbname"
+
+engine = create_async_engine(DB_URL, echo=False)
+SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+# --------------------------------
+# Проверка API-ключа
+# --------------------------------
 async def check_token(api_key: str = Header(None)):
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-
+# --------------------------------
+# Отдаём заявки в 1С
+# --------------------------------
 @app.get("/api/inbox")
 async def api_inbox(api_key: str = Header(None)):
     await check_token(api_key)
     async with SessionLocal() as session:
-        res = await session.execute(text("SELECT * FROM inbox WHERE status='new'"))
+        # Только новые (message IS NULL) или отклонённые (message='отказались')
+        sql = text("""
+            SELECT id, telegram_id, inn, company_name, zakupka_num, message, zakupka_number
+            FROM inbox
+            WHERE (message IS NULL OR message = 'отказались') AND status='new'
+        """)
+        res = await session.execute(sql)
         data = [dict(r._mapping) for r in res.fetchall()]
     return data
 
 
+# --------------------------------
+# Приём результата из 1С
+# --------------------------------
 @app.post("/api/result")
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
+
     async with SessionLocal() as session:
+        # Обновляем данные
         await session.execute(text("""
-            UPDATE inbox SET status=:st, message=:msg, updated_at=NOW() WHERE id=:id
-        """), {"st": data.get("status"), "msg": data.get("message"), "id": data.get("id")})
+            UPDATE inbox
+               SET message = :msg,
+                   zakupka_number = :zn,
+                   updated_at = NOW(),
+                   status = :st
+             WHERE id = :id
+        """), {
+            "id": data.get("id"),
+            "msg": data.get("message"),
+            "zn": data.get("zakupka_number"),
+            "st": data.get("status", "done")
+        })
         await session.commit()
-    # уведомление в Telegram
+
+    # Уведомление в Telegram
     async with SessionLocal() as session:
-        res = await session.execute(text("SELECT telegram_id FROM inbox WHERE id=:id"), {"id": data["id"]})
+        res = await session.execute(
+            text("SELECT telegram_id FROM inbox WHERE id=:id"), {"id": data["id"]}
+        )
         row = res.fetchone()
+
     if row:
         tg = row[0]
-        text_msg = "✅ Заявка обработана в 1С. \nДля добавления новой закупки нажми /start" if data.get(
-            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки. \nДля добавления новой закупки нажми /start"
-        await bot.send_message(tg, text_msg)
+        # определяем текст для оповещения
+        if data.get("message") == "удалена":
+            txt = "❌ Закупка была удалена в 1С.\nДля добавления новой нажми /start"
+        elif data.get("message") == "добавлена":
+            txt = f"✅ В 1С добавлена новая закупка.\n{data.get('zakupka_number')}"
+        else:
+            txt = "⚠️ Обновлено состояние заявки. Нажми /start для новой."
+        await bot.send_message(tg, txt, parse_mode="HTML")
+
     return {"ok": True}
 
 
-@app.post("/api/from1c/error")
-async def api_error(request: Request, api_key: str = Header(None)):
-    await check_token(api_key)
-    payload = await request.json()
+# --------------------------------
+# Удаление старых записей (> 2 месяца)
+# --------------------------------
+@app.on_event("startup")
+@repeat_every(seconds=86400)  # выполняется раз в сутки
+async def cleanup_old_records():
     async with SessionLocal() as session:
         await session.execute(text("""
-            INSERT INTO inbox (telegram_id, message, status) VALUES (0, :msg, 'error')
-        """), {"msg": payload.get("message")})
+            DELETE FROM inbox
+             WHERE created_at < :dt
+        """), {"dt": datetime.utcnow() - timedelta(days=60)})
         await session.commit()
-    return {"ok": True}
 
 # ------------------------------#
 # Start bot (современный способ)
