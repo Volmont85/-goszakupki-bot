@@ -279,15 +279,12 @@ async def api_error(request: Request, api_key: str = Header(None)):
     return {"ok": True}
 
 # ------------------------------#
-# Run
+# Start bot (современный способ)
 # ------------------------------#
-def main():
-    import uvicorn
-    
-    loop = asyncio.get_event_loop()
-    loop.create_task(dp.start_polling(bot))
-    loop.run_forever()
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+async def main():
+    # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    # Современный запуск без get_event_loop()
     asyncio.run(main())
