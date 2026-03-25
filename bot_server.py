@@ -208,7 +208,8 @@ async def handle_inn(msg: Message, state: FSMContext):
             "Записал, продолжаем."
         )
         await state.update_data(inn=inn, company_name=company)
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+                         "Для добавления новой закупки нажми /start")
         await state.clear()
 
     else:
@@ -248,7 +249,8 @@ async def handle_company_name(msg: Message, state: FSMContext):
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
     await session.commit()
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+                     "Для добавления новой закупки нажми /start")
     await state.clear()
 
 
@@ -263,7 +265,8 @@ async def confirm_one(msg: Message, state: FSMContext):
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
             await session.commit()
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+                         "Для добавления новой закупки нажми /start")
         await state.clear()
     else:
         await msg.answer("Пришли ИНН компании, от которой планируем участие:")
@@ -340,7 +343,8 @@ async def choose_company(msg: Message, state: FSMContext):
         )
         await session.commit()
 
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С."
+                     "Для добавления новой закупки нажми /start")
     await state.clear()
 
 
@@ -362,10 +366,12 @@ async def confirm_delete(msg: Message, state: FSMContext):
             )
             await session.commit()
 
-        await msg.answer("✅ Закупка помечена как 'отказались'.")
+        await msg.answer("✅ Закупка помечена как 'отказались'.
+                         "Для добавления новой закупки нажми /start")")
         await state.clear()
     else:
         await msg.answer("Ок, ничего не изменил.")
+                        "Для добавления новой закупки нажми /start")")
         await state.clear()
 
 # ------------------------------#
@@ -402,8 +408,8 @@ async def api_result(request: Request, api_key: str = Header(None)):
         row = res.fetchone()
     if row:
         tg = row[0]
-        text_msg = "✅ Заявка обработана в 1С." if data.get(
-            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки."
+        text_msg = "✅ Заявка обработана в 1С. Для добавления новой закупки нажми /start" if data.get(
+            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки. Для добавления новой закупки нажми /start"
         await bot.send_message(tg, text_msg)
     return {"ok": True}
 
