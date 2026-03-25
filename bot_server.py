@@ -160,49 +160,47 @@ async def handle_inn(msg: Message, state: FSMContext):
         return
 
     company = await get_company_name_by_inn(inn)
-    data = await state.get_data()   # <— добавлено: извлекаем FSM‑данные
+    data = await state.get_data()
 
     if company:
-        # нашли компанию — сохраняем в собственную таблицу
-async with SessionLocal() as session:
-    # Проверяем, есть ли уже такая запись
-    res = await session.execute(
-        text("""
-            SELECT 1 FROM TelegramID
-            WHERE telegram_id = :tg AND inn = :inn
-        """),
-        {"tg": msg.from_user.id, "inn": inn},
-    )
-    exists = res.scalar()
+        # нашли компанию — сохраняем
+        async with SessionLocal() as session:
+            # проверяем, есть ли уже запись в TelegramID
+            res = await session.execute(
+                text("""
+                    SELECT 1 FROM TelegramID
+                    WHERE telegram_id = :tg AND inn = :inn
+                """),
+                {"tg": msg.from_user.id, "inn": inn},
+            )
+            exists = res.scalar()
 
-    # Если записи нет — создаём
-    if not exists:
-        await session.execute(
-            text("""
-                INSERT INTO TelegramID (telegram_id, inn, company_name)
-                VALUES (:tg, :inn, :name)
-            """),
-            {"tg": msg.from_user.id, "inn": inn, "name": company},
-        )
+            if not exists:
+                await session.execute(
+                    text("""
+                        INSERT INTO TelegramID (telegram_id, inn, company_name)
+                        VALUES (:tg, :inn, :name)
+                    """),
+                    {"tg": msg.from_user.id, "inn": inn, "name": company},
+                )
 
-    # Обновляем inbox
-    await session.execute(
-        text("""
-            UPDATE inbox
-            SET inn = :inn,
-                company_name = :nm
-            WHERE telegram_id = :tg
-              AND zakupka_num = :znum
-        """),
-        {
-            "inn": inn,
-            "nm": company,
-            "tg": msg.from_user.id,
-            "znum": data.get("zakupka"),
-        },
-    )
-
-    await session.commit()
+            # обновляем inbox
+            await session.execute(
+                text("""
+                    UPDATE inbox
+                    SET inn = :inn,
+                        company_name = :nm
+                    WHERE telegram_id = :tg
+                      AND zakupka_num = :znum
+                """),
+                {
+                    "inn": inn,
+                    "nm": company,
+                    "tg": msg.from_user.id,
+                    "znum": data.get("zakupka"),
+                },
+            )
+            await session.commit()
 
         await msg.answer(
             f"✅ ИНН {inn} принадлежит компании:\n{company}\n"
@@ -211,6 +209,7 @@ async with SessionLocal() as session:
         await state.update_data(inn=inn, company_name=company)
         await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
         await state.clear()
+
     else:
         # не нашли — просим название вручную
         await msg.answer(
