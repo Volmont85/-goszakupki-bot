@@ -175,6 +175,8 @@ async def handle_inn(msg: Message, state: FSMContext):
             )
             await state.update_data(inn=inn, company_name=company)
             await state.set_state(PurchaseStates.CONFIRM_AUTO)
+                data = await state.get_data()
+            await confirm_auto(msg, state, data)
         else:
             # не нашли — просим название вручную
             await msg.answer(
@@ -208,6 +210,8 @@ async def handle_company_name(msg: Message, state: FSMContext):
     )
     await state.update_data(company_name=company_name)
     await state.set_state(PurchaseStates.CONFIRM_AUTO)
+    data = await state.get_data()
+    await confirm_auto(msg, state, data)
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
@@ -227,14 +231,25 @@ async def confirm_one(msg: Message, state: FSMContext):
         await state.set_state(PurchaseStates.WAIT_INN)
 
 @dp.message(PurchaseStates.CONFIRM_AUTO)
-async def confirm_auto(msg: Message, state: FSMContext):
-        async with SessionLocal() as session:
-            await session.execute(text("""
-                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
-            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
-            await session.commit()
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
-        await state.clear()
+async def confirm_auto(msg: Message, state: FSMContext, data: dict):
+    async with SessionLocal() as session:
+        await session.execute(
+            text("""
+                UPDATE inbox 
+                SET inn = :inn, company_name = :nm 
+                WHERE telegram_id = :tg AND zakupka_num = :znum
+            """),
+            {
+                "inn": data["inn"],
+                "nm": data["company_name"],
+                "tg": msg.from_user.id,
+                "znum": data["zakupka"],
+            },
+        )
+        await session.commit()
+
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await state.clear()
     
 
 @dp.message(PurchaseStates.CHOOSE_COMPANY)
