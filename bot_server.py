@@ -164,7 +164,8 @@ async def handle_inn(msg: Message, state: FSMContext):
 
     if company:
         # нашли компанию — сохраняем в собственную таблицу
-        async with SessionLocal() as session:
+async with SessionLocal() as session:
+    # Проверяем, есть ли уже такая запись
     res = await session.execute(
         text("""
             SELECT 1 FROM TelegramID
@@ -174,6 +175,7 @@ async def handle_inn(msg: Message, state: FSMContext):
     )
     exists = res.scalar()
 
+    # Если записи нет — создаём
     if not exists:
         await session.execute(
             text("""
@@ -183,6 +185,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             {"tg": msg.from_user.id, "inn": inn, "name": company},
         )
 
+    # Обновляем inbox
     await session.execute(
         text("""
             UPDATE inbox
@@ -198,6 +201,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             "znum": data.get("zakupka"),
         },
     )
+
     await session.commit()
 
         await msg.answer(
