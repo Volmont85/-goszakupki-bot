@@ -524,6 +524,10 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
 @app.post("/webhook")
 async def webhook(request: Request):
     update = types.Update.model_validate(await request.json())
