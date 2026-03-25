@@ -498,18 +498,12 @@ async def cleanup_old_records_loop():
         # Засыпаем на сутки (86400 секунд)
         await asyncio.sleep(86400)
 
-from contextlib import asynccontextmanager
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("✅ App starting up")
-    yield
-    print("🛑 App shutting down")
-
-app = FastAPI(lifespan=lifespan)
-   # """
-   # Событие при старте приложения — создаём фоновую задачу очистки.
-   # Здесь же можно инициализировать подключение к БД, бота и т.д.
-   # """
+@app.on_event("startup")
+async def startup_event():
+    """
+    Событие при старте приложения — создаём фоновую задачу очистки.
+    Здесь же можно инициализировать подключение к БД, бота и т.д.
+    """
     asyncio.create_task(cleanup_old_records_loop())
     print("[startup] Фоновая очистка записей запущена.")
 
@@ -522,48 +516,6 @@ async def main():
     # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
     await dp.start_polling(bot)
 
-import socket
-import logging
-import uvicorn
-from fastapi import FastAPI, Request
-from aiogram import Bot, Dispatcher, types
-from aiogram.enums import ParseMode
-import os
-
-app = FastAPI()
-
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher()
-
-@app.post("/")
-async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = types.Update.model_validate(data)
-    await dp.feed_update(bot, update)
-    return {"ok": True}
-
-@app.get("/ping")
-async def ping():
-    return {"status": "alive"}
-
-@app.get("/ping")
-async def ping():
-    return {"ok": True}
-
-@app.get("/ping")
-@app.get("/api/inbox")
-@app.post("/api/result")
-async def ping():
-    return {"status": "ok"}
-
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    host = os.getenv("SERVER_HOST", "0.0.0.0")
-    port = int(os.getenv("SERVER_PORT", "8000"))
-    ip = socket.gethostbyname(socket.gethostname())
-
-    logging.info(f"🚀 FastAPI starting -> http://{ip}:{port}")
-    logging.info(f"📡 For 1C: use http://{host}:{port}/api/inbox")
-
-    uvicorn.run("bot_server:app", host=host, port=port)
+    # Современный запуск без get_event_loop()
+    asyncio.run(main())
