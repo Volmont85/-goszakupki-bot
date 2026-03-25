@@ -173,7 +173,7 @@ async def handle_inn(msg: Message, state: FSMContext):
                 "Записал, продолжаем."
             )
             await state.update_data(inn=inn, company_name=company)
-            await state.set_state(PurchaseStates.CONFIRM_ONEA)
+            await state.set_state(PurchaseStates.CONFIRM_AUTO)
         else:
             # не нашли — просим название вручную
             await msg.answer(
@@ -206,7 +206,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
         "Теперь можно продолжать работу."
     )
     await state.update_data(company_name=company_name)
-    await state.set_state(PurchaseStates.CONFIRM_ONEA)
+    await state.set_state(PurchaseStates.CONFIRM_AUTO)
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
@@ -225,8 +225,8 @@ async def confirm_one(msg: Message, state: FSMContext):
         await msg.answer("Пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
 
-@dp.message(PurchaseStates.CONFIRM_ONEA)
-async def confirm_one(msg: Message, state: FSMContext):
+@dp.message(PurchaseStates.CONFIRM_AUTO)
+async def confirm_auto(msg: Message, state: FSMContext):
         async with SessionLocal() as session:
             await session.execute(text("""
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
