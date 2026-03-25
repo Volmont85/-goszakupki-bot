@@ -175,7 +175,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             )
             await state.update_data(inn=inn, company_name=company)
             await state.set_state(PurchaseStates.CONFIRM_AUTO)
-                data = await state.get_data()
+            data = await state.get_data()
             await confirm_auto(msg, state, data)
         else:
             # не нашли — просим название вручную
