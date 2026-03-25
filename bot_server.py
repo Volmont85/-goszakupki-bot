@@ -42,6 +42,7 @@ class PurchaseStates(StatesGroup):
     WAIT_NAME = State()
     CHOOSE_COMPANY = State()
     CONFIRM_ONE = State()
+    CONFIRM_AUTO = State()
 
 # ------------------------------#
 # Helpers
