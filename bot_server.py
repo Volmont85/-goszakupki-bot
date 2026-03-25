@@ -1,3 +1,5 @@
+from bs4 import BeautifulSoup
+import aiohttp
 import asyncio
 import os
 import re
@@ -31,11 +33,14 @@ app = FastAPI(title="Telegram ↔ 1C Integration")
 # DB setup
 # ------------------------------#
 engine = create_async_engine(DB_DSN, echo=False)
-SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+SessionLocal = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False)
 
 # ------------------------------#
 # FSM States
 # ------------------------------#
+
+
 class PurchaseStates(StatesGroup):
     WAIT_ZAKUPKA = State()
     WAIT_INN = State()
@@ -50,16 +55,17 @@ class PurchaseStates(StatesGroup):
 def validate_zakupka(num: str) -> bool:
     return num.isdigit() and len(num) in (11, 19)
 
+
 def validate_inn(num: str) -> bool:
     return num.isdigit() and len(num) in (10, 12)
+
 
 # ------------------------------#
 # Telegram logic
 # ------------------------------#
-import aiohttp
-from bs4 import BeautifulSoup
 
 # --- поиск компании по ИНН через list-org.com ---
+
 async def get_company_name_by_inn(inn: str) -> str | None:
     """
     Возвращает название компании с сайта list-org.com по ИНН,
@@ -92,8 +98,6 @@ async def get_company_name_by_inn(inn: str) -> str | None:
         print(f"[WARN] Ошибка при парсинге list-org: {e}")
 
     return None
-
-
 
 
 @dp.message(Command("start"))
@@ -217,9 +221,10 @@ async def handle_company_name(msg: Message, state: FSMContext):
     await session.execute(text("""
             UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
         """), {"inn": inn, "nm": name, "tg": msg.from_user.id, "znum": data["zakupka"]})
-        await session.commit()
+    await session.commit()
     await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
     await state.clear()
+
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
@@ -237,7 +242,7 @@ async def confirm_one(msg: Message, state: FSMContext):
     else:
         await msg.answer("Пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
-    
+
 
 @dp.message(PurchaseStates.CHOOSE_COMPANY)
 async def choose_company(msg: Message, state: FSMContext):
@@ -271,9 +276,12 @@ async def choose_company(msg: Message, state: FSMContext):
 # ------------------------------#
 # API endpoints for 1C
 # ------------------------------#
+
+
 async def check_token(api_key: str = Header(None)):
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
+
 
 @app.get("/api/inbox")
 async def api_inbox(api_key: str = Header(None)):
@@ -283,8 +291,9 @@ async def api_inbox(api_key: str = Header(None)):
         data = [dict(r._mapping) for r in res.fetchall()]
     return data
 
+
 @app.post("/api/result")
-async def api_result(request: Request, api_key: str = Header(None)): 
+async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
     async with SessionLocal() as session:
@@ -298,9 +307,11 @@ async def api_result(request: Request, api_key: str = Header(None)):
         row = res.fetchone()
     if row:
         tg = row[0]
-        text_msg = "✅ Заявка обработана в 1С." if data.get("status") == "done" else "⚠️ Произошла ошибка при обработке заявки."
+        text_msg = "✅ Заявка обработана в 1С." if data.get(
+            "status") == "done" else "⚠️ Произошла ошибка при обработке заявки."
         await bot.send_message(tg, text_msg)
     return {"ok": True}
+
 
 @app.post("/api/from1c/error")
 async def api_error(request: Request, api_key: str = Header(None)):
@@ -316,6 +327,8 @@ async def api_error(request: Request, api_key: str = Header(None)):
 # ------------------------------#
 # Start bot (современный способ)
 # ------------------------------#
+
+
 async def main():
     # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
     await dp.start_polling(bot)
