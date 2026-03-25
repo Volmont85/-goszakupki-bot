@@ -524,6 +524,16 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+@app.post("/webhook")
+async def webhook(request: Request):
+    update = types.Update.model_validate(await request.json())
+    await dp.feed_update(bot, update)
+    return {"ok": True}
+
+@app.get("/ping")
+async def ping():
+    return {"ok": True}
+
 @app.get("/ping")
 @app.get("/api/inbox")
 @app.post("/api/result")
