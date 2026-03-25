@@ -4,7 +4,7 @@ import asyncio
 import os
 import re
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Header, HTTPException
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
@@ -473,18 +473,39 @@ async def api_result(request: Request, api_key: str = Header(None)):
     return {"ok": True}
 
 
-# --------------------------------
-# Удаление старых записей (> 2 месяца)
-# --------------------------------
+# ================================================================
+# 🚀 Автоматическое удаление старых записей (> 2 месяцев)
+# ================================================================
+
+import asyncio
+from datetime import datetime, timedelta
+from sqlalchemy import text
+
+async def cleanup_old_records_loop():
+    """Фоновая задача очистки таблицы inbox"""
+    while True:
+        try:
+            async with SessionLocal() as session:
+                # Удаляем записи старше 60 дней
+                await session.execute(
+                    text("DELETE FROM inbox WHERE created_at < :dt"),
+                    {"dt": datetime.utcnow() - timedelta(days=60)}
+                )
+                await session.commit()
+                print("[cleanup] Старые записи удалены из inbox.")
+        except Exception as e:
+            print(f"[cleanup] Ошибка очистки: {e}")
+        # Засыпаем на сутки (86400 секунд)
+        await asyncio.sleep(86400)
+
 @app.on_event("startup")
-@repeat_every(seconds=86400)  # выполняется раз в сутки
-async def cleanup_old_records():
-    async with SessionLocal() as session:
-        await session.execute(text("""
-            DELETE FROM inbox
-             WHERE created_at < :dt
-        """), {"dt": datetime.utcnow() - timedelta(days=60)})
-        await session.commit()
+async def startup_event():
+    """
+    Событие при старте приложения — создаём фоновую задачу очистки.
+    Здесь же можно инициализировать подключение к БД, бота и т.д.
+    """
+    asyncio.create_task(cleanup_old_records_loop())
+    print("[startup] Фоновая очистка записей запущена.")
 
 # ------------------------------#
 # Start bot (современный способ)
