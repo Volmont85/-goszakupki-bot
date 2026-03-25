@@ -273,30 +273,99 @@ async def confirm_one(msg: Message, state: FSMContext):
 async def choose_company(msg: Message, state: FSMContext):
     data = await state.get_data()
     text_inp = msg.text.strip()
+
+    # --- определяем ИНН и название компании ---
     if text_inp.isdigit():
-        idx = int(text_inp)-1
+        idx = int(text_inp) - 1
         if idx < 0 or idx >= len(data["companies"]):
-            await msg.answer("Ответ неверный, пожалуйста повтори номер нужной фирмы.")
+            await msg.answer("Ответ неверный, пожалуйста, повтори номер нужной фирмы.")
             return
         inn, name = data["companies"][idx]
+
     elif validate_inn(text_inp):
         inn = text_inp
         async with SessionLocal() as session:
-            res = await session.execute(text("SELECT company_name FROM TelegramID WHERE inn=:i"), {"i": inn})
+            res = await session.execute(
+                text("SELECT company_name FROM TelegramID WHERE inn=:i"),
+                {"i": inn},
+            )
             row = res.fetchone()
-            if not row:
-                await state.set_state(PurchaseStates.WAIT_INN)
+        if row:
+            name = row[0]
+        else:
+            await state.update_data(inn=inn)
+            await state.set_state(PurchaseStates.WAIT_INN)
+            await msg.answer("Не нашёл фирму с этим ИНН. Пришли правильный ИНН ещё раз.")
+            return
+
     else:
         await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
         return
 
+    # --- Проверяем, добавлялась ли закупка ранее ---
     async with SessionLocal() as session:
-        await session.execute(text("""
-            UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
-        """), {"inn": inn, "nm": name, "tg": msg.from_user.id, "znum": data["zakupka"]})
+        res = await session.execute(
+            text("""
+                SELECT 1 FROM inbox
+                WHERE inn = :inn AND zakupka_num = :znum
+            """),
+            {"inn": inn, "znum": data["zakupka"]},
+        )
+        already_exists = res.scalar()
+
+    if already_exists:
+        # сохраняем данные в состоянии, чтобы потом использовать при подтверждении
+        await state.update_data(inn=inn, company_name=name)
+        await msg.answer("⚠️ Эта закупка была добавлена ранее. Удалить?")
+        await state.set_state(PurchaseStates.CONFIRM_DELETE)
+        return
+
+    # --- если не дубликат, просто сохраняем ---
+    async with SessionLocal() as session:
+        await session.execute(
+            text("""
+                UPDATE inbox
+                SET inn = :inn,
+                    company_name = :nm
+                WHERE telegram_id = :tg
+                  AND zakupka_num = :znum
+            """),
+            {
+                "inn": inn,
+                "nm": name,
+                "tg": msg.from_user.id,
+                "znum": data["zakupka"],
+            },
+        )
         await session.commit()
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
     await state.clear()
+
+
+# --- хэндлер подтверждения удаления ---
+@dp.message(PurchaseStates.CONFIRM_DELETE)
+async def confirm_delete(msg: Message, state: FSMContext):
+    data = await state.get_data()
+    answer = msg.text.lower().strip()
+
+    if answer in ("да", "ага", "удал", "удали", "удалить"):
+        async with SessionLocal() as session:
+            await session.execute(
+                text("""
+                    UPDATE inbox
+                    SET message = 'отказались'
+                    WHERE inn = :inn AND zakupka_num = :znum
+                """),
+                {"inn": data["inn"], "znum": data["zakupka"]},
+            )
+            await session.commit()
+
+        await msg.answer("✅ Закупка помечена как 'отказались'.")
+        await state.clear()
+    else:
+        await msg.answer("Ок, ничего не изменил.")
+        await state.clear()
 
 # ------------------------------#
 # API endpoints for 1C
