@@ -179,7 +179,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             )
             await state.update_data(inn=inn, company_name=company)
             async with SessionLocal() as session:
-                company_name = await session.execute(
+                name = await session.execute(
                 text("SELECT inn, company_name FROM TelegramID WHERE telegram_id=:tg"),
                 {"tg": msg.from_user.id},
                 )
