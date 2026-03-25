@@ -395,8 +395,8 @@ app = FastAPI()
 # --------------------------------
 # Настройки
 # --------------------------------
-API_KEY = "Jf3qKrL7vT9xBz8sWp2n"
-DB_URL = "postgresql+asyncpg://user:password@host/dbname"
+DB_URL = os.getenv("POSTGRES_DSN")
+API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(15)
 
 engine = create_async_engine(DB_URL, echo=False)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
