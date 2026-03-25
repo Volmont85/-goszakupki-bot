@@ -231,24 +231,21 @@ async def confirm_one(msg: Message, state: FSMContext):
         await state.set_state(PurchaseStates.WAIT_INN)
 
 @dp.message(PurchaseStates.CONFIRM_AUTO)
-async def confirm_auto(msg: Message, state: FSMContext, data: dict):
+async def confirm_auto(msg: Message, state: FSMContext):
     async with SessionLocal() as session:
-        await session.execute(
-            text("""
-                UPDATE inbox 
-                SET inn = :inn, company_name = :nm 
-                WHERE telegram_id = :tg AND zakupka_num = :znum
-            """),
-            {
-                "inn": data["inn"],
-                "nm": data["company_name"],
-                "tg": msg.from_user.id,
-                "znum": data["zakupka"],
-            },
-        )
+        await session.execute(text("""
+            UPDATE inbox
+            SET inn = :inn, company_name = :nm
+            WHERE telegram_id = :tg AND zakupka_num = :znum
+        """), {
+            "inn": data["inn"],
+            "nm": data["company_name"],
+            "tg": msg.from_user.id,
+            "znum": data["zakupka"]
+        })
         await session.commit()
 
-    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+    await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
     await state.clear()
     
 
