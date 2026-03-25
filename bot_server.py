@@ -396,47 +396,34 @@ app = FastAPI()
 # Настройки
 # --------------------------------
 DB_URL = os.getenv("POSTGRES_DSN")
-API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(15)
 
 engine = create_async_engine(DB_URL, echo=False)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-
 # --------------------------------
-# Проверка API-ключа
-# --------------------------------
-async def check_token(api_key: str = Header(None)):
-    if api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-# --------------------------------
-# Отдаём заявки в 1С
+# Отдаём заявки в 1С
 # --------------------------------
 @app.get("/api/inbox")
-async def api_inbox(api_key: str = Header(None)):
-    await check_token(api_key)
+async def api_inbox():
     async with SessionLocal() as session:
-        # Только новые (message IS NULL) или отклонённые (message='отказались')
         sql = text("""
             SELECT id, telegram_id, inn, company_name, zakupka_num, message, zakupka_number
-            FROM inbox
-            WHERE (message IS NULL OR message = 'отказались') AND status='new'
+              FROM inbox
+             WHERE (message IS NULL OR message = 'отказались')
+               AND status = 'new'
         """)
         res = await session.execute(sql)
         data = [dict(r._mapping) for r in res.fetchall()]
     return data
 
-
 # --------------------------------
-# Приём результата из 1С
+# Приём результата из 1С
 # --------------------------------
 @app.post("/api/result")
-async def api_result(request: Request, api_key: str = Header(None)):
-    await check_token(api_key)
+async def api_result(request: Request):
     data = await request.json()
 
     async with SessionLocal() as session:
-        # Обновляем данные
         await session.execute(text("""
             UPDATE inbox
                SET message = :msg,
@@ -452,7 +439,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         })
         await session.commit()
 
-    # Уведомление в Telegram
+    # Уведомление в Telegram
     async with SessionLocal() as session:
         res = await session.execute(
             text("SELECT telegram_id FROM inbox WHERE id=:id"), {"id": data["id"]}
@@ -461,13 +448,12 @@ async def api_result(request: Request, api_key: str = Header(None)):
 
     if row:
         tg = row[0]
-        # определяем текст для оповещения
         if data.get("message") == "удалена":
-            txt = "❌ Закупка была удалена в 1С.\nДля добавления новой нажми /start"
+            txt = "❌ Закупка была удалена в 1С.\nДля добавления новой нажми /start"
         elif data.get("message") == "добавлена":
-            txt = f"✅ В 1С добавлена новая закупка.\n{data.get('zakupka_number')}"
+            txt = f"✅ В 1С добавлена новая закупка.\n{data.get('zakupka_number')}"
         else:
-            txt = "⚠️ Обновлено состояние заявки. Нажми /start для новой."
+            txt = "⚠️ Обновлено состояние заявки. Нажми /start для новой."
         await bot.send_message(tg, txt, parse_mode="HTML")
 
     return {"ok": True}
