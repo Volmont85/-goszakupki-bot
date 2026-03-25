@@ -218,7 +218,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
     )
     await state.update_data(company_name=company_name)
     async with SessionLocal() as session:
-    await session.execute(text("""
+        await session.execute(text("""
             UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
         """), {"inn": inn, "nm": name, "tg": msg.from_user.id, "znum": data["zakupka"]})
     await session.commit()
