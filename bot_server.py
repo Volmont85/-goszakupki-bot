@@ -55,42 +55,137 @@ def validate_inn(num: str) -> bool:
 # ------------------------------#
 # Telegram logic
 # ------------------------------#
+import aiohttp
+from bs4 import BeautifulSoup
+
+# --- поиск компании по ИНН через list-org.com ---
+async def get_company_name_by_inn(inn: str) -> str | None:
+    try:
+        url = f"https://www.list-org.com/search?type=inn&val={inn}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                html = await response.text()
+        soup = BeautifulSoup(html, "html.parser")
+        company_block = soup.find("a", class_="upper")
+        if company_block:
+            return company_block.text.strip()
+    except Exception as e:
+        print(f"[WARN] Ошибка при запросе list-org: {e}")
+    return None
+
+
 @dp.message(Command("start"))
 async def start_cmd(msg: Message, state: FSMContext):
-    await msg.answer("Привет! Пришли номер закупки для участия (11 или 19 цифр):")
+    await msg.answer("Привет! Пришли номер закупки для участия (11 или 19 цифр):")
     await state.set_state(PurchaseStates.WAIT_ZAKUPKA)
 
+
+# --- этап 1: получаем номер закупки ---
 @dp.message(PurchaseStates.WAIT_ZAKUPKA)
 async def handle_zakupka(msg: Message, state: FSMContext):
     num = msg.text.strip()
     if not validate_zakupka(num):
-        await msg.answer("Проверь пожалуйста номер закупки. Для 44ФЗ должно быть 19 цифр, для 223ФЗ — 11.")
+        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
         return
+
     async with SessionLocal() as session:
-        await session.execute(text(
-            "INSERT INTO inbox (telegram_id, zakupka_num) VALUES (:tg, :num)"
-        ), {"tg": msg.from_user.id, "num": num})
+        await session.execute(
+            text("INSERT INTO inbox (telegram_id, zakupka_num) VALUES (:tg, :num)"),
+            {"tg": msg.from_user.id, "num": num},
+        )
         await session.commit()
+
     await state.update_data(zakupka=num)
-    # Проверяем, есть ли компания
+
+    # Проверяем, есть ли связанная компания
     async with SessionLocal() as session:
-        res = await session.execute(text(
-            "SELECT inn, company_name FROM TelegramID WHERE telegram_id=:tg"
-        ), {"tg": msg.from_user.id})
+        res = await session.execute(
+            text("SELECT inn, company_name FROM TelegramID WHERE telegram_id=:tg"),
+            {"tg": msg.from_user.id},
+        )
         rows = res.fetchall()
+
     if not rows:
-        await msg.answer("Пришли ИНН компании, от которой планируем участие:")
+        await msg.answer("Теперь пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
     elif len(rows) == 1:
         inn, name = rows[0]
-        await msg.answer(f"Участвуем от «{name}» (ИНН {inn}), да?")
+        await msg.answer(f"Участвуем от «{name}» (ИНН {inn}), да?")
         await state.update_data(inn=inn, company_name=name)
         await state.set_state(PurchaseStates.CONFIRM_ONE)
     else:
-        text_list = "\n".join([f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)])
-        await msg.answer(f"Для тебя я нашёл следующие фирмы:\n{text_list}\n\nВведи номер нужной фирмы или пришли новый ИНН:")
+        text_list = "\n".join(
+            [f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)]
+        )
+        await msg.answer(
+            f"Для тебя я нашёл несколько фирм:\n{text_list}"
+            "\n\nВведи номер нужной фирмы или пришли новый ИНН:"
+        )
         await state.update_data(companies=rows)
         await state.set_state(PurchaseStates.CHOOSE_COMPANY)
+
+
+# --- этап 2: пользователь присылает ИНН, ищем компанию в list‑org ---
+@dp.message(PurchaseStates.WAIT_INN)
+async def handle_inn(msg: Message, state: FSMContext):
+    inn = msg.text.strip()
+    if not validate_inn(inn):
+        await msg.answer("Проверь ИНН — должно быть 10 или 12 цифр!")
+        return
+
+    company = await get_company_name_by_inn(inn)
+
+    async with SessionLocal() as session:
+        if company:
+            # нашли сразу — сохраняем
+            await session.execute(
+                text(
+                    "INSERT INTO TelegramID (telegram_id, inn, company_name) "
+                    "VALUES (:tg, :inn, :name)"
+                ),
+                {"tg": msg.from_user.id, "inn": inn, "name": company},
+            )
+            await session.commit()
+
+            await msg.answer(
+                f"✅ ИНН {inn} принадлежит компании:\n<b>{company}</b>\n"
+                "Записал, продолжаем."
+            )
+            await state.update_data(inn=inn, company_name=company)
+            await state.set_state(PurchaseStates.CONFIRM_ONE)
+        else:
+            # не нашли — просим название вручную
+            await msg.answer(
+                "❗ Не удалось найти компанию по ИНН.\n"
+                "Пришли полное название компании (как в ЕГРЮЛ):"
+            )
+            await state.update_data(inn=inn)
+            await state.set_state(PurchaseStates.WAIT_NAME)
+
+
+# --- этап 3: если не нашли по ИНН, пользователь вводит название сам ---
+@dp.message(PurchaseStates.WAIT_NAME)
+async def handle_company_name(msg: Message, state: FSMContext):
+    data = await state.get_data()
+    inn = data.get("inn")
+    company_name = msg.text.strip()
+
+    async with SessionLocal() as session:
+        await session.execute(
+            text(
+                "INSERT INTO TelegramID (telegram_id, inn, company_name) "
+                "VALUES (:tg, :inn, :name)"
+            ),
+            {"tg": msg.from_user.id, "inn": inn, "name": company_name},
+        )
+        await session.commit()
+
+    await msg.answer(
+        f"✅ Компания <b>{company_name}</b> сохранена для ИНН {inn}.\n"
+        "Теперь можно продолжать работу."
+    )
+    await state.update_data(company_name=company_name)
+    await state.set_state(PurchaseStates.CONFIRM_ONE)
 
 @dp.message(PurchaseStates.CONFIRM_ONE)
 async def confirm_one(msg: Message, state: FSMContext):
@@ -125,11 +220,7 @@ async def choose_company(msg: Message, state: FSMContext):
             res = await session.execute(text("SELECT company_name FROM TelegramID WHERE inn=:i"), {"i": inn})
             row = res.fetchone()
             if not row:
-                await msg.answer("Такая компания не найдена, напиши её название для добавления:")
-                await state.update_data(inn=inn)
-                await state.set_state(PurchaseStates.WAIT_NAME)
-                return
-            name = row[0]
+                await state.set_state(PurchaseStates.WAIT_INN)
     else:
         await msg.answer("Ответ неверный, введи номер фирмы или ИНН.")
         return
@@ -140,40 +231,6 @@ async def choose_company(msg: Message, state: FSMContext):
         """), {"inn": inn, "nm": name, "tg": msg.from_user.id, "znum": data["zakupka"]})
         await session.commit()
     await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
-    await state.clear()
-
-@dp.message(PurchaseStates.WAIT_INN)
-async def handle_inn(msg: Message, state: FSMContext):
-    inn = msg.text.strip()
-    if not validate_inn(inn):
-        await msg.answer("Проверь ИНН, должно быть 10 или 12 цифр!")
-        return
-    async with SessionLocal() as session:
-        res = await session.execute(text("SELECT company_name FROM TelegramID WHERE inn=:inn"), {"inn": inn})
-        row = res.fetchone()
-    if not row:
-        await msg.answer("Такая компания не найдена. Напиши название компании в соответствии с выпиской ЕГРЮЛ:")
-        await state.update_data(inn=inn)
-        await state.set_state(PurchaseStates.WAIT_NAME)
-    else:
-        name = row[0]
-        await state.update_data(inn=inn, company_name=name)
-        await msg.answer(f"Участвуем от «{name}», да?")
-        await state.set_state(PurchaseStates.CONFIRM_ONE)
-
-@dp.message(PurchaseStates.WAIT_NAME)
-async def handle_name(msg: Message, state: FSMContext):
-    name = msg.text.strip()
-    data = await state.get_data()
-    async with SessionLocal() as session:
-        await session.execute(text("""
-            INSERT INTO TelegramID (telegram_id, inn, company_name) VALUES (:tg, :inn, :nm)
-        """), {"tg": msg.from_user.id, "inn": data["inn"], "nm": name})
-        await session.execute(text("""
-            UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
-        """), {"inn": data["inn"], "nm": name, "tg": msg.from_user.id, "znum": data["zakupka"]})
-        await session.commit()
-    await msg.answer(f"✅ Компания {name} добавлена. Заявка передана на обработку в 1С.")
     await state.clear()
 
 # ------------------------------#
