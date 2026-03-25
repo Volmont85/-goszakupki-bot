@@ -367,11 +367,11 @@ async def confirm_delete(msg: Message, state: FSMContext):
             await session.commit()
 
         await msg.answer("✅ Закупка помечена как 'отказались'."
-                         "Для добавления новой закупки нажми /start")")
+                         "Для добавления новой закупки нажми /start")
         await state.clear()
     else:
         await msg.answer("Ок, ничего не изменил."
-                        "Для добавления новой закупки нажми /start")")
+                        "Для добавления новой закупки нажми /start")
         await state.clear()
 
 # ------------------------------#
