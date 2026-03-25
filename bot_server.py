@@ -389,6 +389,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import asyncio
+import os
 
 app = FastAPI()
 
@@ -511,6 +512,8 @@ from fastapi import FastAPI
 app = FastAPI()
 
 @app.get("/ping")
+@app.get("/api/inbox")
+@app.post("/api/result")
 async def ping():
     return {"status": "ok"}
 
