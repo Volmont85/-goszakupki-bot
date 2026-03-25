@@ -61,8 +61,8 @@ from bs4 import BeautifulSoup
 # --- поиск компании по ИНН через list-org.com ---
 async def get_company_name_by_inn(inn: str) -> str | None:
     """
-    Возвращает название компании с сайта list-org.com по ИНН.
-    Работает с результатами поиска, где теги <a> внутри div.org_list.
+    Возвращает название компании с сайта list-org.com по ИНН,
+    очищая текст от HTML-тегов (<b>, <i> и др.).
     """
     try:
         url = f"https://www.list-org.com/search?type=inn&val={inn}"
@@ -72,20 +72,25 @@ async def get_company_name_by_inn(inn: str) -> str | None:
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # Основной вариант: ищем <div class="org_list">, потом <a> внутри
+        # Основной вариант
         org_div = soup.find("div", class_="org_list")
         if org_div:
             link = org_div.find("a", href=True)
-            if link and link.text.strip():
-                return link.text.strip()
+            if link:
+                # Получаем текст без тегов "<b>" и любых других вложенных
+                company_name = link.get_text(strip=True)
+                return company_name
 
-        # Резерв: если сайт немного изменит верстку, попробуем найти по тексту href="/company/"
+        # Резерв: если структура другая
         link = soup.find("a", href=re.compile(r"^/company/\d+"))
-        if link and link.text.strip():
-            return link.text.strip()
+        if link:
+            company_name = link.get_text(strip=True)
+            return company_name
 
     except Exception as e:
         print(f"[WARN] Ошибка при парсинге list-org: {e}")
+
+    return None
 
 
 
