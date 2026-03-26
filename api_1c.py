@@ -10,7 +10,7 @@ from bot_instance import bot   # см. ниже
 
 router = APIRouter()
 
-API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(16)
+API_KEY = os.getenv("API_KEY")
 
 
 # -------------------------------
