@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from aiogram.client.default import DefaultBotProperties
 
 # ------------------------------#
 # ENV and setup
@@ -30,7 +32,12 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(
+        parse_mode=ParseMode.HTML
+    )
+)
 dp = Dispatcher()
 app = FastAPI(title="Telegram ↔ 1C Integration")
 
