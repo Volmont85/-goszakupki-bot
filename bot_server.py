@@ -418,7 +418,9 @@ async def startup_event():
 # ------------------------------#
 # Start bot (современный способ)
 # ------------------------------#
+from api_1c import router as api_1c_router
 
+app.include_router(api_1c_router)
 
 async def main():
    
