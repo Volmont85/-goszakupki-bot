@@ -71,7 +71,7 @@ def validate_zakupka(num: str) -> bool:
 
 def validate_inn(num: str) -> bool:
     return num.isdigit() and len(num) in (10, 12)
-print(f"API_KEY - [API_KEY]")
+print(f"API_KEY - {API_KEY}")
 # ------------------------------#
 # Telegram logic
 # ------------------------------#
