@@ -19,7 +19,7 @@ API_KEY = os.getenv("API_KEY")
 async def check_token(api_key: str = Header(None)):
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
-
+print(f"API_KEY postman - {api_key}")
 
 # -------------------------------
 # GET /api/inbox
