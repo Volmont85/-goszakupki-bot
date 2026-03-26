@@ -16,17 +16,17 @@ API_KEY = os.getenv("API_KEY")
 # -------------------------------
 # Проверка API ключа
 # -------------------------------
-async def check_token(api_key: str = Header(None)):
-    if api_key != API_KEY:
+async def check_token(x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
-print(f"API_KEY postman - {api_key}")
+print(f"API_KEY postman - {x_api_key}")
 
 # -------------------------------
 # GET /api/inbox
 # -------------------------------
 @router.get("/api/inbox")
-async def api_inbox(api_key: str = Header(None)):
-    await check_token(api_key)
+async def api_inbox(x_api_key: str = Header(None)):
+    await check_token(x_api_key)
 
     async with SessionLocal() as session:
         res = await session.execute(text("""
@@ -45,8 +45,8 @@ async def api_inbox(api_key: str = Header(None)):
 # POST /api/result
 # -------------------------------
 @router.post("/api/result")
-async def api_result(request: Request, api_key: str = Header(None)):
-    await check_token(api_key)
+async def api_result(request: Request, x_api_key: str = Header(None)):
+    await check_token(x_api_key)
     data = await request.json()
 
     async with SessionLocal() as session:
