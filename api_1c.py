@@ -28,17 +28,18 @@ async def check_token(api_key: str = Header(None)):
 async def api_inbox(api_key: str = Header(None)):
     await check_token(api_key)
 
-    async with SessionLocal() as session:
-        res = await session.execute(text("""
-            SELECT id, telegram_id, inn, company_name,
-                   zakupka_num, message, zakupka_number
-            FROM inbox
-            WHERE status = 'new'
-        """))
-
-        data = [dict(r._mapping) for r in res.fetchall()]
-
-    return data
+    try:
+        async with SessionLocal() as session:
+            res = await session.execute(text("""
+                SELECT id, telegram_id, inn, company_name,
+                       zakupka_num, message, zakupka_number
+                FROM inbox
+                WHERE status = 'new'
+            """))
+            data = [dict(r._mapping) for r in res.fetchall()]
+        return data
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # -------------------------------
