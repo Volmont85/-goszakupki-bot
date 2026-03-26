@@ -30,7 +30,7 @@ API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(15)
 USE_WEBHOOK = os.getenv("USE_WEBHOOK", "true").lower() == "true"
 WEBHOOK_PATH = "/webhook"
 RAILWAY_STATIC_URL = os.getenv("RAILWAY_STATIC_URL")
-PORT = os.getenv("PORT", "8000")
+PORT = os.getenv("PORT", "443")
 
 if RAILWAY_STATIC_URL:
     WEBHOOK_URL = f"https://{RAILWAY_STATIC_URL}/webhook"
