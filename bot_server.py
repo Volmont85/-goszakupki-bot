@@ -28,6 +28,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DB_DSN = os.getenv("POSTGRES_DSN")
 API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(32)
+PORT = int(os.environ.get("PORT", 443))
 
 # ================================================================
 # FASTAPI APP
@@ -428,4 +429,4 @@ app.include_router(api_1c_router)
 # ================================================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("bot_server:app", host="0.0.0.0", port=8000, reload=False)
+    #uvicorn.run("bot_server:app", host="0.0.0.0", port=PORT, reload=False)
