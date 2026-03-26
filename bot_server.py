@@ -6,8 +6,7 @@ import re
 import secrets
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Request, Header, HTTPException
-from aiogram import Bot, Dispatcher, F, types
-from aiogram.enums import ParseMode
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
@@ -16,8 +15,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
-from contextlib import asynccontextmanager
-from aiogram.client.default import DefaultBotProperties
 
 # ------------------------------#
 # ENV and setup
@@ -27,23 +24,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DB_DSN = os.getenv("POSTGRES_DSN")
 API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(15)
-USE_WEBHOOK = os.getenv("USE_WEBHOOK", "true").lower() == "true"
-WEBHOOK_PATH = "/webhook"
-RAILWAY_STATIC_URL = os.getenv("RAILWAY_STATIC_URL")
-PORT = os.getenv("PORT", "443")
 
-if RAILWAY_STATIC_URL:
-    WEBHOOK_URL = f"https://{RAILWAY_STATIC_URL}/webhook"
-else:
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(
-        parse_mode=ParseMode.HTML
-    )
-)
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI(title="Telegram ↔ 1C Integration")
 
@@ -120,8 +102,6 @@ async def get_company_name_by_inn(inn: str) -> str | None:
 
 
 @dp.message(Command("start"))
-async def cmd_start(message: Message):
-    await message.answer("✅ Бот работает!")
 async def start_cmd(msg: Message, state: FSMContext):
     await msg.answer("Привет! Пришли номер закупки для участия (11 или 19 цифр):")
     await state.set_state(PurchaseStates.WAIT_ZAKUPKA)
@@ -410,43 +390,7 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import asyncio
 
-cleanup_task = None
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    if USE_WEBHOOK:
-        if not WEBHOOK_URL:
-            raise ValueError("WEBHOOK_URL not set")
-
-        await bot.set_webhook(WEBHOOK_URL)
-        print("✅ Webhook установлен:", WEBHOOK_URL)
-
-    yield
-
-    # shutdown
-    if USE_WEBHOOK:
-        await bot.delete_webhook()
-        print("🛑 Webhook удалён")
-
-    await bot.session.close()
-
-# ✅ Запускаем фоновую задачу
-    cleanup_task = asyncio.create_task(cleanup_old_records_loop())
-    print("[startup] Фоновая очистка запущена.")
-
-    yield  # ← приложение работает
-
-    # ✅ Корректное завершение при остановке
-    print("⛔ Остановка приложения")
-
-    if cleanup_task:
-        cleanup_task.cancel()
-        try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            print("[shutdown] Фоновая очистка остановлена.")
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 # --------------------------------
 # Настройки
@@ -481,7 +425,6 @@ async def api_inbox(api_key: str = Header(None)):
         res = await session.execute(sql)
         data = [dict(r._mapping) for r in res.fetchall()]
     return data
-
 
 
 # --------------------------------
@@ -529,19 +472,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
 
     return {"ok": True}
 
-@app.post(WEBHOOK_PATH)
-async def webhook_handler(request: Request):
-    data = await request.json()
-    update = types.Update.model_validate(data)
-    await dp.feed_update(bot, update)
-    return {"ok": True}
 
-# Healthcheck для Railway
-@app.get("/")
-@app.get("/api/inbox")
-@app.post("/api/result")
-async def root():
-    return {"status": "ok"}
 # ================================================================
 # 🚀 Автоматическое удаление старых записей (> 2 месяцев)
 # ================================================================
@@ -567,6 +498,14 @@ async def cleanup_old_records_loop():
         # Засыпаем на сутки (86400 секунд)
         await asyncio.sleep(86400)
 
+@app.on_event("startup")
+async def startup_event():
+    """
+    Событие при старте приложения — создаём фоновую задачу очистки.
+    Здесь же можно инициализировать подключение к БД, бота и т.д.
+    """
+    asyncio.create_task(cleanup_old_records_loop())
+    print("[startup] Фоновая очистка записей запущена.")
 
 # ------------------------------#
 # Start bot (современный способ)
@@ -575,21 +514,12 @@ async def cleanup_old_records_loop():
 
 async def main():
     # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
-   async def start_polling():
-    print("🚀 Запуск в режиме POLLING")
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    if USE_WEBHOOK:
+        import uvicorn
+        uvicorn.run("bot_server:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    else:
+        await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    if USE_WEBHOOK:
-        # Railway режим
-        import uvicorn
-        print("🚀 Запуск в режиме WEBHOOK")
-        uvicorn.run(
-            "bot_server:app",
-            host="0.0.0.0",
-            port=int(os.getenv("PORT", 443)),
-        )
-    else:
-        # Локальный режим
-        asyncio.run(start_polling())
+    # Современный запуск без get_event_loop()
+    asyncio.run(main())
