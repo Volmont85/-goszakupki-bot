@@ -513,11 +513,7 @@ async def startup_event():
 
 
 async def main():
-    # Здесь можно добавить фоновые задачи, например FastAPI если нужно.
-    if USE_WEBHOOK:
-        import uvicorn
-        uvicorn.run("bot_server:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-    else:
+   
         await dp.start_polling(bot)
 
 if __name__ == "__main__":
