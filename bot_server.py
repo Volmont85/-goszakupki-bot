@@ -27,7 +27,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DB_DSN = os.getenv("POSTGRES_DSN")
-API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(32)
+API_KEY = os.getenv("API_KEY")
 PORT = int(os.environ.get("PORT", 443))
 
 # ================================================================
