@@ -538,6 +538,8 @@ async def webhook_handler(request: Request):
 
 # Healthcheck для Railway
 @app.get("/")
+@app.get("/api/inbox")
+@app.post("/api/result")
 async def root():
     return {"status": "ok"}
 # ================================================================
