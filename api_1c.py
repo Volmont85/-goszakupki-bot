@@ -62,7 +62,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
             "id": data.get("id"),
             "msg": data.get("message"),
             "zn": data.get("zakupka_number"),
-            "st": data.get("status", "done")
+            "st": data.get("processed", "done")
         })
 
         await session.commit()
