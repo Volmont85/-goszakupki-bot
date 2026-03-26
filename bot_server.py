@@ -29,7 +29,13 @@ DB_DSN = os.getenv("POSTGRES_DSN")
 API_KEY = os.getenv("API_KEY") or secrets.token_urlsafe(15)
 USE_WEBHOOK = os.getenv("USE_WEBHOOK", "true").lower() == "true"
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+RAILWAY_STATIC_URL = os.getenv("RAILWAY_STATIC_URL")
+PORT = os.getenv("PORT", "8000")
+
+if RAILWAY_STATIC_URL:
+    WEBHOOK_URL = f"https://{RAILWAY_STATIC_URL}/webhook"
+else:
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 
 bot = Bot(
@@ -404,6 +410,8 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import asyncio
 
+cleanup_task = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if USE_WEBHOOK:
@@ -421,6 +429,22 @@ async def lifespan(app: FastAPI):
         print("🛑 Webhook удалён")
 
     await bot.session.close()
+
+# ✅ Запускаем фоновую задачу
+    cleanup_task = asyncio.create_task(cleanup_old_records_loop())
+    print("[startup] Фоновая очистка запущена.")
+
+    yield  # ← приложение работает
+
+    # ✅ Корректное завершение при остановке
+    print("⛔ Остановка приложения")
+
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            print("[shutdown] Фоновая очистка остановлена.")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -541,14 +565,6 @@ async def cleanup_old_records_loop():
         # Засыпаем на сутки (86400 секунд)
         await asyncio.sleep(86400)
 
-@app.on_event("startup")
-async def startup_event():
-    """
-    Событие при старте приложения — создаём фоновую задачу очистки.
-    Здесь же можно инициализировать подключение к БД, бота и т.д.
-    """
-    asyncio.create_task(cleanup_old_records_loop())
-    print("[startup] Фоновая очистка записей запущена.")
 
 # ------------------------------#
 # Start bot (современный способ)
