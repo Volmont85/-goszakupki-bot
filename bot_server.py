@@ -250,12 +250,12 @@ async def handle_company_name(msg: Message, state: FSMContext):
     last_name = msg.from_user.last_name
     async with SessionLocal() as session:
         await session.execute(
-            text(
+                    text("""
                         INSERT INTO TelegramID (telegram_id, inn, company_name, username, first_name, last_name)
                         VALUES (:tg, :inn, :name, :username, :first_name, :last_name)
-                    ),
+                    """),
                     {"tg": msg.from_user.id, "inn": inn, "name": company, "username": username, "first_name": first_name, "last_name": last_name},
-        )
+                    )
         await session.commit()
 
     await msg.answer(
