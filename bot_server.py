@@ -173,6 +173,9 @@ async def handle_inn(msg: Message, state: FSMContext):
 
     company = await get_company_name_by_inn(inn)
     data = await state.get_data()
+    username = msg.from_user.username
+    first_name = msg.from_user.first_name
+    last_name = msg.from_user.last_name
 
     if company:
         # нашли компанию — сохраняем
@@ -190,10 +193,10 @@ async def handle_inn(msg: Message, state: FSMContext):
             if not exists:
                 await session.execute(
                     text("""
-                        INSERT INTO TelegramID (telegram_id, inn, company_name)
-                        VALUES (:tg, :inn, :name)
+                        INSERT INTO TelegramID (telegram_id, inn, company_name, username, first_name, last_name)
+                        VALUES (:tg, :inn, :name, :username, :first_name, :last_name)
                     """),
-                    {"tg": msg.from_user.id, "inn": inn, "name": company},
+                    {"tg": msg.from_user.id, "inn": inn, "name": company, "username": username, "first_name": first_name, "last_name": last_name},
                 )
 
             # обновляем inbox
@@ -239,14 +242,16 @@ async def handle_company_name(msg: Message, state: FSMContext):
     data = await state.get_data()
     inn = data.get("inn")
     company_name = msg.text.strip()
-
+    username = msg.from_user.username
+    first_name = msg.from_user.first_name
+    last_name = msg.from_user.last_name
     async with SessionLocal() as session:
         await session.execute(
             text(
-                "INSERT INTO TelegramID (telegram_id, inn, company_name) "
-                "VALUES (:tg, :inn, :name)"
-            ),
-            {"tg": msg.from_user.id, "inn": inn, "name": company_name},
+                        INSERT INTO TelegramID (telegram_id, inn, company_name, username, first_name, last_name)
+                        VALUES (:tg, :inn, :name, :username, :first_name, :last_name)
+                    """),
+                    {"tg": msg.from_user.id, "inn": inn, "name": company, "username": username, "first_name": first_name, "last_name": last_name},
         )
         await session.commit()
 
