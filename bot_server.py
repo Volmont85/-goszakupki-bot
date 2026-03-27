@@ -25,7 +25,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # ================================================================
 # ENV
-# ================================================================
+# ================================================================ 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
