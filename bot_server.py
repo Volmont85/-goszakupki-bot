@@ -20,8 +20,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
 
 # ================================================================
 # ENV
