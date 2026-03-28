@@ -465,7 +465,7 @@ async def startup_event():
 # 1C ROUTER
 # ================================================================
 from api_1c import router as api_1c_router
-from routers import odata
+import odata
 app.include_router(api_1c_router)
 app.include_router(odata.router)
 # ================================================================
