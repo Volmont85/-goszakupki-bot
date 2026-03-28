@@ -21,6 +21,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
+from database import engine
+from models import Base
+
+async def init_models():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 
 # ================================================================
 # ENV
