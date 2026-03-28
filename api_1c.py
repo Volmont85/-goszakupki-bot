@@ -83,7 +83,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         elif data.get("message") == "добавлена":
             txt = f"✅ Закупка добавлена в 1С:\n{data.get('zakupka_number')}"
         else:
-            txt = f'⚠️ Статус обновлён - {data.get("message")}'
+            txt = f'⚠️ Статус обновлён - {data.get("zakupka_number")}'
 
         await bot.send_message(tg, txt)
 
