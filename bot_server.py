@@ -329,14 +329,14 @@ async def choose_company(msg: Message, state: FSMContext):
     # --- Проверяем, добавлялась ли закупка ранее ---
     async with SessionLocal() as session:
         res = await session.execute(
-            text("""
-                SELECT 1
-                FROM inbox
-                WHERE inn = :inn
-                  AND zakupka_num = :znum
-            """),
-            {"inn": inn, "znum": data["zakupka"]},
-        )
+    text("""
+        SELECT 1
+        FROM inbox
+        WHERE inn = :inn
+          AND zakupka_num = :znum
+    """),
+    {"inn": inn, "znum": data["zakupka_num"]},  # <-- правильно
+)
         already_exists = res.scalar()
 
     if already_exists:
