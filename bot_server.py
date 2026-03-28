@@ -421,6 +421,23 @@ async def cleanup_old_records_loop():
         except Exception as e:
             print(f"[cleanup] Error: {e}")
 
+        async with SessionLocal() as session:
+                cutoff = datetime.utcnow() - timedelta(hours=48)
+
+                query = text("""
+                    DELETE FROM inbox
+                    WHERE (inn IS NULL OR TRIM(inn) = '')
+                      AND created_at < :dt
+                """)
+
+                result = await session.execute(query, {"dt": cutoff})
+                await session.commit()
+
+                print(f"[cleanup] Удалено {result.rowcount} строк (старше 48 ч без INN).")
+
+        except Exception as e:
+            print(f"[cleanup] Ошибка очистки: {e}")
+
         await asyncio.sleep(86400)
 
 # ================================================================
