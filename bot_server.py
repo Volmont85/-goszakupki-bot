@@ -342,8 +342,8 @@ async def choose_company(msg: Message, state: FSMContext):
         WHERE inn = :inn
           AND zakupka_num = :znum
     """),
-    {"inn": inn, "znum": data["zakupka_num"]},  # <-- правильно
-)
+    {"inn": inn, "znum": data["zakupka"]}, 
+        )
         already_exists = res.scalar()
 
     if already_exists:
