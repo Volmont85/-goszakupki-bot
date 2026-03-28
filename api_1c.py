@@ -59,7 +59,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
                    status = :st
              WHERE id = :id
         """), {
-            "id": "id": int(data.get("id")),
+            "id": int(data.get("id")),
             "msg": data.get("message"),
             "zn": data.get("zakupka_number"),
             "st": data.get("status", "done")
