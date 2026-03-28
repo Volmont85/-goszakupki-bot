@@ -464,9 +464,9 @@ async def startup_event():
 # ================================================================
 # 1C ROUTER
 # ================================================================
-from api_1c import router as api_1c_router
+from api_1c import router as api_1c_router, odata
 app.include_router(api_1c_router)
-
+app.include_router(odata.router)
 # ================================================================
 # ENTRYPOINT
 # ================================================================
