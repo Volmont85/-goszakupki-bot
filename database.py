@@ -2,7 +2,7 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from .models import Base
+from models import Base
 import os
 
 DATABASE_URL = os.getenv("POSTGRES_DSN")  # например postgresql+asyncpg://user:pass@host/db
