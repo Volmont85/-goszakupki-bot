@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime
 from database import SessionLocal
+from models import Inbox
 from bot_instance import bot   # см. ниже
 
 router = APIRouter()
