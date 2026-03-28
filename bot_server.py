@@ -421,8 +421,18 @@ async def cleanup_old_records_loop():
         except Exception as e:
             print(f"[cleanup] Error: {e}")
 
-        async with SessionLocal() as session:
-                cutoff = datetime.utcnow() - timedelta(hours=48)
+        await asyncio.sleep(86400)
+# ================================================================
+async def cleanup_Null_records_loop():
+    """
+    Асинхронная периодическая очистка таблицы inbox:
+    - удаляет записи, где inn отсутствует или пустая строка,
+    - если запись старше 48 часов.
+    """
+    while True:
+        try:
+            async with SessionLocal() as session:
+                cutoff = datetime.utcnow() - timedelta(hours=1)
 
                 query = text("""
                     DELETE FROM inbox
@@ -438,6 +448,7 @@ async def cleanup_old_records_loop():
         except Exception as e:
             print(f"[cleanup] Ошибка очистки: {e}")
 
+        # спим 24 часа до следующей чистки
         await asyncio.sleep(86400)
 
 # ================================================================
@@ -446,6 +457,7 @@ async def cleanup_old_records_loop():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
+    asyncio.create_task(cleanup_Null_records_loop())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
