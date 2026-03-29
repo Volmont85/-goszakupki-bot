@@ -251,54 +251,56 @@ async def confirm_one(msg: Message, state: FSMContext):
 # ================================================================
 # STAGE 5 — ВЫБОР КОМПАНИИ
 # ================================================================
+
 @dp.message(PurchaseStates.CHOOSE_COMPANY)
 async def choose_company(msg: Message, state: FSMContext):
     data = await state.get_data()
     zakupka_id = data["zakupka_id"]
     text_inp = msg.text.strip()
 
+    # 1️⃣ Если введён ИНН (10 или 12 цифр)
     if text_inp.isdigit() and len(text_inp) in (10, 12):
-        # введён ИНН
-        inn = text_inp
-        async with SessionLocal() as session:
-            res = await session.execute(text("SELECT company_name FROM TelegramID WHERE inn=:i"), {"i": inn})
-            row = res.fetchone()
-        if not row:
-           # await msg.answer("⚠️ Не нашёл фирму с этим ИНН, введи ещё раз.")
-            await state.set_state(PurchaseStates.WAIT_INN)
-            return
-        name = row[0]
-    elif text_inp.isdigit():
+        await state.update_data(inn=text_inp)
+        await state.set_state(PurchaseStates.WAIT_INN)
+        await msg.answer("🔍 Введён ИНН, продолжаем регистрацию компании.")
+        return
+
+    # 2️⃣ Если введено число — проверяем, что это индекс в списке компаний
+    if text_inp.isdigit():
         idx = int(text_inp) - 1
-        if idx < 0 or idx >= len(data["companies"]):
-            await msg.answer("Неверный номер фирмы.")
-        elif len(text_inp) in (10, 12):
-            await state.set_state(PurchaseStates.WAIT_INN)
-        return
-        inn, name = data["companies"][idx]
-    else:
-        await msg.answer("⚠️ Введи номер фирмы или ИНН.")
-        return
+        companies = data.get("companies", [])
+        if 0 <= idx < len(companies):
+            inn, name = companies[idx]
+            async with SessionLocal() as session:
+                # проверка, нет ли уже такой записи
+                res = await session.execute(
+                    text("SELECT 1 FROM inbox WHERE inn=:inn AND zakupka_num=:num"),
+                    {"inn": inn, "num": data["zakupka"]}
+                )
+                if res.scalar():
+                    await state.update_data(inn=inn, company_name=name)
+                    await msg.answer("⚠️ Такая закупка уже есть. Удалить?")
+                    await state.set_state(PurchaseStates.CONFIRM_DELETE)
+                    return
 
-    # проверяем на дубликат
-    async with SessionLocal() as session:
-        res = await session.execute(
-            text("SELECT 1 FROM inbox WHERE inn=:inn AND zakupka_num=:num"),
-            {"inn": inn, "num": data["zakupka"]})
-        if res.scalar():
-            await state.update_data(inn=inn, company_name=name)
-            await msg.answer("⚠️ Такая закупка есть. Удалить?")
-            await state.set_state(PurchaseStates.CONFIRM_DELETE)
+                # сохраняем выбор
+                await session.execute(
+                    text("UPDATE inbox SET inn=:inn, company_name=:nm WHERE id=:id"),
+                    {"inn": inn, "nm": name, "id": zakupka_id},
+                )
+                await session.commit()
+
+            await msg.answer(f"✅ Выбрана компания: «{name}» (ИНН {inn}). Заявка сохранена. \nДля добавления новой закупки нажми /start")
+            await state.clear()
             return
 
-        await session.execute(
-            text("UPDATE inbox SET inn=:inn, company_name=:nm WHERE id=:id"),
-            {"inn": inn, "nm": name, "id": zakupka_id},
-        )
-        await session.commit()
+        # если индекс вне диапазона
+        await msg.answer("⚠️ Неверный номер фирмы. Попробуй снова.")
+        return
 
-    await msg.answer("✅ Заявка сохранена и передана в 1С. \nДля добавления новой закупки нажми /start")
-    await state.clear()
+    # 3️⃣ Если это не число вообще
+    await msg.answer("⚠️ Введи номер компании из списка или ИНН (10 или 12 цифр).")
+
 # ================================================================
 # CONFIRM DELETE
 # ================================================================
