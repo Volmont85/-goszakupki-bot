@@ -308,17 +308,41 @@ async def choose_company(msg: Message, state: FSMContext):
 @dp.message(PurchaseStates.CONFIRM_DELETE)
 async def confirm_delete(msg: Message, state: FSMContext):
     data = await state.get_data()
+    inn = data.get("inn")
+    zakupka_num = data.get("zakupka")
     zakupka_id = data.get("zakupka_id")
-    if msg.text.lower().strip() in ("да", "ага", "удал", "удали", "удалить"):
+
+    # нормализуем ответ пользователя
+    user_answer = msg.text.lower().strip()
+
+    if user_answer in ("да", "ага", "удал", "удали", "удалить"):
         async with SessionLocal() as session:
+            # проверяем наличие закупки с этим ИНН и номером
+            res = await session.execute(
+                text("SELECT id FROM inbox WHERE inn=:inn AND zakupka_num=:num"),
+                {"inn": inn, "num": zakupka_num},
+            )
+            row = res.fetchone()
+
+            if not row:
+                await msg.answer("⚠️ Не нашёл закупку с этим ИНН и номером закупки.")
+                await state.clear()
+                return
+            
+            # обновляем нужную запись
             await session.execute(
-                text("UPDATE inbox SET message='отказались', status='new' WHERE id=:id"),
-                {"id": zakupka_id},
+                text("UPDATE inbox SET message='отказались', status='new' WHERE inn=:inn AND zakupka_num=:num"),
+                {"inn": inn, "num": zakupka_num},
             )
             await session.commit()
-        await msg.answer("✅ Закупка помечена как 'отказались'. \nДля добавления новой закупки нажми /start")
+
+        await msg.answer(
+            "✅ Закупка помечена как «отказались».\n"
+            "Для добавления новой закупки нажми /start"
+        )
     else:
-        await msg.answer("Ок, ничего не изменил. \nДля добавления новой закупки нажми /start")
+        await msg.answer("👌 Ок, ничего не изменил.\nДля добавления новой закупки нажми /start")
+
     await state.clear()
 # ================================================================
 # CLEANUP TASKS
