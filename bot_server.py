@@ -193,7 +193,7 @@ async def handle_inn(msg: Message, state: FSMContext):
             )
             await session.commit()
 
-        await msg.answer(f"✅ ИНН {inn} принадлежит «{company}».\nЗаявка сохранена.")
+        await msg.answer(f"✅ ИНН {inn} принадлежит «{company}».\nЗаявка сохранена.\nДля добавления новой закупки нажми /start")
         await state.clear()
     else:
         await msg.answer("⚠️ Компания не найдена. Пришли полное название (как в ЕГРЮЛ):")
