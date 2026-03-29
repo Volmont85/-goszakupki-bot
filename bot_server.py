@@ -264,7 +264,7 @@ async def choose_company(msg: Message, state: FSMContext):
             res = await session.execute(text("SELECT company_name FROM TelegramID WHERE inn=:i"), {"i": inn})
             row = res.fetchone()
         if not row:
-            await msg.answer("⚠️ Не нашёл фирму с этим ИНН, введи ещё раз.")
+           # await msg.answer("⚠️ Не нашёл фирму с этим ИНН, введи ещё раз.")
             await state.set_state(PurchaseStates.WAIT_INN)
             return
         name = row[0]
