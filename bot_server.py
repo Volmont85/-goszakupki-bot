@@ -143,7 +143,7 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         await session.commit()
 
     await state.update_data(zakupka=num)
-
+    await state.update_data(id=id)
     # Проверяем, есть ли связанная компания
     async with SessionLocal() as session:
         res = await session.execute(
