@@ -366,7 +366,7 @@ async def choose_company(msg: Message, state: FSMContext):
                 SET inn = :inn,
                     company_name = :nm
                 WHERE telegram_id = :tg
-                  AND  id:id
+                  AND id=:zakupka_id
                   AND zakupka_num = :znum
             """),
             {
