@@ -261,8 +261,8 @@ async def choose_company(msg: Message, state: FSMContext):
     # 1️⃣ Если введён ИНН (10 или 12 цифр)
     if text_inp.isdigit() and len(text_inp) in (10, 12):
         await state.update_data(inn=text_inp)
-        await state.set_state(PurchaseStates.WAIT_INN)
         await msg.answer("🔍 Введён ИНН, продолжаем регистрацию компании.")
+        await state.set_state(PurchaseStates.WAIT_INN)
         return
 
     # 2️⃣ Если введено число — проверяем, что это индекс в списке компаний
