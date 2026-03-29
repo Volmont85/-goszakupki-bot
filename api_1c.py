@@ -35,7 +35,7 @@ async def api_inbox(api_key: str = Header(None)):
                 SELECT id, telegram_id, inn, company_name,
                        zakupka_num, message, zakupka_number
                 FROM inbox
-                WHERE status = 'new'
+                WHERE status = 'new' and (inn IS NULL OR TRIM(inn) = '')
             """))
             data = [dict(r._mapping) for r in res.fetchall()]
         return data
