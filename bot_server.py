@@ -147,7 +147,6 @@ async def handle_zakupka(msg: Message, state: FSMContext):
     new_id = result.scalar_one()  # извлекаем значение id
     await session.commit()
 
-    await state.update_data(zakupka=num)
     await state.update_data(zakupka=num, zakupka_id=new_id)
     
     # Проверяем, есть ли связанная компания
@@ -277,7 +276,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
     await state.update_data(company_name=company_name)
     async with SessionLocal() as session:
         await session.execute(text("""
-                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum AND id:id
+                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum AND id=:zakupka_id
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
     await session.commit()
     await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
@@ -293,7 +292,7 @@ async def confirm_one(msg: Message, state: FSMContext):
         # фиксируем в inbox firm+inn
         async with SessionLocal() as session:
             await session.execute(text("""
-                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum  AND id:id
+                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum  AND id=:zakupka_id
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
             await session.commit()
         await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
