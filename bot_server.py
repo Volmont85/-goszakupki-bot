@@ -277,7 +277,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
     async with SessionLocal() as session:
         await session.execute(text("""
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum AND id=:zakupka_id
-            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
+            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"], "zakupka_id": data["zakupka_id"]})
     await session.commit()
     await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                      "Для добавления новой закупки нажми /start")
@@ -293,7 +293,7 @@ async def confirm_one(msg: Message, state: FSMContext):
         async with SessionLocal() as session:
             await session.execute(text("""
                 UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum  AND id=:zakupka_id
-            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
+            """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"], "zakupka_id": data["zakupka_id"]})
             await session.commit()
         await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
                          "Для добавления новой закупки нажми /start")
@@ -366,7 +366,6 @@ async def choose_company(msg: Message, state: FSMContext):
                 SET inn = :inn,
                     company_name = :nm
                 WHERE telegram_id = :tg
-                  AND id=:zakupka_id
                   AND zakupka_num = :znum
             """),
             {
