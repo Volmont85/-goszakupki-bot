@@ -135,8 +135,8 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
         return
 
-    async with SessionLocal() as session:
-        result = await session.execute(
+async with SessionLocal() as session:
+    result = await session.execute(
         text("""
             INSERT INTO inbox (telegram_id, zakupka_num)
             VALUES (:tg, :num)
@@ -144,10 +144,10 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         """),
         {"tg": msg.from_user.id, "num": num},
     )
-    new_id = result.scalar_one()  # извлекаем значение id
-    await session.commit()
+    new_id = result.scalar_one()
+    await session.commit()  # ✅ Коммит внутри контекста
 
-    await state.update_data(zakupka=num, zakupka_id=new_id)
+await state.update_data(zakupka=num, zakupka_id=new_id)
     
     # Проверяем, есть ли связанная компания
     async with SessionLocal() as session:
