@@ -265,6 +265,7 @@ async def choose_company(msg: Message, state: FSMContext):
             row = res.fetchone()
         if not row:
             await msg.answer("⚠️ Не нашёл фирму с этим ИНН, введи ещё раз.")
+            await state.set_state(PurchaseStates.WAIT_INN)
             return
         name = row[0]
     elif text_inp.isdigit():
