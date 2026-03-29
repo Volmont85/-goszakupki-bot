@@ -136,12 +136,16 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         return
 
     async with SessionLocal() as session:
-        await session.execute(
-            text("INSERT INTO inbox (telegram_id, zakupka_num) VALUES (:tg, :num)") RETURNING id, 
-            {"tg": msg.from_user.id, "num": num},
-        )
-        new_id = result.scalar_one
-        await session.commit()
+        result = await session.execute(
+        text("""
+            INSERT INTO inbox (telegram_id, zakupka_num)
+            VALUES (:tg, :num)
+            RETURNING id
+        """),
+        {"tg": msg.from_user.id, "num": num},
+    )
+    new_id = result.scalar_one()  # извлекаем значение id
+    await session.commit()
 
     await state.update_data(zakupka=num)
     await state.update_data(zakupka=num, zakupka_id=new_id)
