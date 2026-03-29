@@ -389,7 +389,7 @@ async def confirm_delete(msg: Message, state: FSMContext):
             await session.execute(
                 text("""
                     UPDATE inbox
-                    SET message = 'отказались'
+                    SET message = 'отказались',
                         status = 'new'
                     WHERE inn = :inn AND zakupka_num = :znum
                 """),
