@@ -226,6 +226,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
         await session.commit()
 
     await msg.answer(f"✅ Компания «{company_name}» сохранена, ИНН {inn}. Заявка передана в 1С.")
+    await bot.send_message(tg, "Для добавления новой закупки нажми /start")
     await state.clear()
 
 # ================================================================
@@ -243,6 +244,7 @@ async def confirm_one(msg: Message, state: FSMContext):
             )
             await session.commit()
         await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.")
+        await bot.send_message(tg, "Для добавления новой закупки нажми /start")
         await state.clear()
     else:
         await msg.answer("Ок, пришли новый ИНН:")
@@ -297,7 +299,7 @@ async def choose_company(msg: Message, state: FSMContext):
 
     await msg.answer("✅ Заявка сохранена и передана в 1С.")
     await state.clear()
-
+await bot.send_message(tg, "Для добавления новой закупки нажми /start")
 # ================================================================
 # CONFIRM DELETE
 # ================================================================
@@ -316,7 +318,7 @@ async def confirm_delete(msg: Message, state: FSMContext):
     else:
         await msg.answer("Ок, ничего не изменил.")
     await state.clear()
-
+await bot.send_message(tg, "Для добавления новой закупки нажми /start")
 # ================================================================
 # CLEANUP TASKS
 # ================================================================
