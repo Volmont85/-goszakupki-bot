@@ -263,6 +263,7 @@ async def choose_company(msg: Message, state: FSMContext):
         await state.update_data(inn=text_inp)
         await msg.answer("🔍 Введён ИНН, продолжаем регистрацию компании.")
         await state.set_state(PurchaseStates.WAIT_INN)
+        await handle_inn(msg, state)
         return
 
     # 2️⃣ Если введено число — проверяем, что это индекс в списке компаний
