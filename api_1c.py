@@ -86,5 +86,5 @@ async def api_result(request: Request, api_key: str = Header(None)):
             txt = f'⚠️ Статус обновлён - {data.get("zakupka_number")}'
 
         await bot.send_message(tg, txt)
-
+        await bot.send_message(tg, "Чтобы добавить еще одну закупку нажми \start")
     return {"ok": True}
