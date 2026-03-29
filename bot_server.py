@@ -270,7 +270,7 @@ async def choose_company(msg: Message, state: FSMContext):
         name = row[0]
     elif text_inp.isdigit():
         idx = int(text_inp) - 1
-        if idx < 0 or idx >= len(data["companies"]) or not len(text_inp) in (10, 12):
+        if idx < 0 or idx >= len(data["companies"]):
             await msg.answer("Неверный номер фирмы.")
         elif len(text_inp) in (10, 12):
             await state.set_state(PurchaseStates.WAIT_INN)
