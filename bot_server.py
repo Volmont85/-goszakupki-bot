@@ -287,7 +287,7 @@ async def confirm_one(msg: Message, state: FSMContext):
         # фиксируем в inbox firm+inn
         async with SessionLocal() as session:
             await session.execute(text("""
-                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum
+                UPDATE inbox SET inn=:inn, company_name=:nm WHERE telegram_id=:tg AND zakupka_num=:znum  AND id:id
             """), {"inn": data["inn"], "nm": data["company_name"], "tg": msg.from_user.id, "znum": data["zakupka"]})
             await session.commit()
         await msg.answer("✅ Заявка сохранена и передана на обработку в 1С.\n"
@@ -361,6 +361,7 @@ async def choose_company(msg: Message, state: FSMContext):
                 SET inn = :inn,
                     company_name = :nm
                 WHERE telegram_id = :tg
+                  AND  id:id
                   AND zakupka_num = :znum
             """),
             {
