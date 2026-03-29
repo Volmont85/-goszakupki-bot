@@ -128,27 +128,23 @@ async def start_cmd(msg: Message, state: FSMContext):
 
 
 # --- этап 1: получаем номер закупки ---
-@dp.message(PurchaseStates.WAIT_ZAKUPKA)
 async def handle_zakupka(msg: Message, state: FSMContext):
     num = msg.text.strip()
-    if not validate_zakupka(num):
-        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
-        return
 
-async with SessionLocal() as session:
-    result = await session.execute(
-        text("""
-            INSERT INTO inbox (telegram_id, zakupka_num)
-            VALUES (:tg, :num)
-            RETURNING id
-        """),
-        {"tg": msg.from_user.id, "num": num},
-    )
-    new_id = result.scalar_one()
-    await session.commit()  # ✅ Коммит внутри контекста
+    async with SessionLocal() as session:
+        result = await session.execute(
+            text("""
+                INSERT INTO inbox (telegram_id, zakupka_num)
+                VALUES (:tg, :num)
+                RETURNING id
+            """),
+            {"tg": msg.from_user.id, "num": num},
+        )
+        new_id = result.scalar_one()
+        await session.commit()  # ✅ Коммит внутри контекста
 
-await state.update_data(zakupka=num, zakupka_id=new_id)
-    
+    await state.update_data(zakupka=num, zakupka_id=new_id)
+
     # Проверяем, есть ли связанная компания
     async with SessionLocal() as session:
         res = await session.execute(
@@ -160,11 +156,13 @@ await state.update_data(zakupka=num, zakupka_id=new_id)
     if not rows:
         await msg.answer("Теперь пришли ИНН компании, от которой планируем участие:")
         await state.set_state(PurchaseStates.WAIT_INN)
+
     elif len(rows) == 1:
         inn, name = rows[0]
         await msg.answer(f"Участвуем от «{name}» (ИНН {inn}), да?")
         await state.update_data(inn=inn, company_name=name)
         await state.set_state(PurchaseStates.CONFIRM_ONE)
+
     else:
         text_list = "\n".join(
             [f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)]
