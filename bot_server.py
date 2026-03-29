@@ -23,7 +23,6 @@ from datetime import datetime
 
 from database import engine
 from models import Base
-from models import Inbox
 
 async def init_models():
     async with engine.begin() as conn:
@@ -131,18 +130,20 @@ async def start_cmd(msg: Message, state: FSMContext):
 # --- этап 1: получаем номер закупки ---
 async def handle_zakupka(msg: Message, state: FSMContext):
     num = msg.text.strip()
-    if not validate_zakupka(num):
-        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
-        return
 
     async with SessionLocal() as session:
-        await session.execute(
-            text("INSERT INTO inbox (telegram_id, zakupka_num) VALUES (:tg, :num)"),
+        result = await session.execute(
+            text("""
+                INSERT INTO inbox (telegram_id, zakupka_num)
+                VALUES (:tg, :num)
+                RETURNING id
+            """),
             {"tg": msg.from_user.id, "num": num},
         )
-        await session.commit()
+        new_id = result.scalar_one()
+        await session.commit()  # ✅ Коммит внутри контекста
 
-    await state.update_data(zakupka=num)
+    await state.update_data(zakupka=num, zakupka_id=new_id)
 
     # Проверяем, есть ли связанная компания
     async with SessionLocal() as session:
@@ -218,14 +219,12 @@ async def handle_inn(msg: Message, state: FSMContext):
                         company_name = :nm
                     WHERE telegram_id = :tg
                       AND zakupka_num = :znum
-                      AND id=:zakupka_id
                 """),
                 {
                     "inn": inn,
                     "nm": company,
                     "tg": msg.from_user.id,
                     "znum": data.get("zakupka"),
-                    "zakupka_id": data["zakupka_id"]
                 },
             )
             await session.commit()
@@ -366,14 +365,12 @@ async def choose_company(msg: Message, state: FSMContext):
                     company_name = :nm
                 WHERE telegram_id = :tg
                   AND zakupka_num = :znum
-                  AND id=:zakupka_id
             """),
             {
                 "inn": inn,
                 "nm": name,
                 "tg": msg.from_user.id,
-                "znum": data["zakupka"]
-                "zakupka_id": data["zakupka_id"],
+                "znum": data["zakupka"],
             },
         )
         await session.commit()
@@ -397,9 +394,9 @@ async def confirm_delete(msg: Message, state: FSMContext):
                     UPDATE inbox
                     SET message = 'отказались',
                         status = 'new'
-                    WHERE inn = :inn AND zakupka_num = :znum AND id=:zakupka_id
+                    WHERE inn = :inn AND zakupka_num = :znum
                 """),
-                {"inn": data["inn"], "znum": data["zakupka"]}, "zakupka_id": data["zakupka_id"]
+                {"inn": data["inn"], "znum": data["zakupka"]},
             )
             await session.commit()
 
