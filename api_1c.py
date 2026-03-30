@@ -51,7 +51,11 @@ async def api_inbox(api_key: str = Header(None)):
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
-
+    return {
+        "id": int(data.get("id")) if data.get("id") else None,
+        "status": data.get("status"),
+        "msg": data.get("message")
+        }
     async with SessionLocal() as session:
         await session.execute(text("""
             UPDATE inbox
@@ -62,9 +66,9 @@ async def api_result(request: Request, api_key: str = Header(None)):
              WHERE id = :id
         """), {
             "id": id,
-            "msg": data.get("message"),
-            "zn": data.get("zakupka_number"),
-            "st": data.get("status", "done")
+            "msg": message,
+            "zn": zakupka_number,
+            "st": status
         })
 
         await session.commit()
