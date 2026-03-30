@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import json
 from fastapi import APIRouter, Header, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime
@@ -50,7 +51,6 @@ async def api_inbox(api_key: str = Header(None)):
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
-    data2 = json.loads(data) if isinstance(data, str) else data
     async with SessionLocal() as session:
         await session.execute(text("""
             UPDATE inbox
@@ -60,7 +60,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
                    status = :st
              WHERE id = :id
         """), {
-            "id": int(data2.get("id")),
+            "id": int(data.get("id")),
             "msg": data.get("message"),
             "zn": data.get("zakupka_number"),
             "st": data.get("status", "done")
@@ -71,7 +71,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         # получаем telegram_id
         res = await session.execute(
             text("SELECT telegram_id FROM inbox WHERE id=:id"),
-            {"id": int(data2.get("id"))}
+            {"id": int(data.get("id"))}
         )
         row = res.fetchone()
 
