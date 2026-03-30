@@ -72,6 +72,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
                        updated_at = NOW(),
                        status = :st
                  WHERE id = :id
+                   AND inn IS NOT NULL
             """),
             {
                 "id": id,
