@@ -98,8 +98,8 @@ async def api_result(request: Request, api_key: str = Header(None)):
         if message == "удалена":
             txt = "❌ Закупка удалена в 1С."
         elif message == "добавлена":
-            txt = f"✅ Закупка добавлена в 1С:\n{zakupka_number}"
-        else:
+            txt = f"✅ Закупка добавлена\n{zakupka_number} в 1С:\n{zakupka_number}"
+        elif message== "уже создана":
             txt = f"⚠️ Статус обновлён - {zakupka_number}"
 
         await bot.send_message(tg, txt)
