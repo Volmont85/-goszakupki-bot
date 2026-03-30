@@ -51,6 +51,7 @@ async def api_inbox(api_key: str = Header(None)):
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
+
     async with SessionLocal() as session:
         await session.execute(text("""
             UPDATE inbox
@@ -60,7 +61,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
                    status = :st
              WHERE id = :id
         """), {
-            "id": int(data.get("id")),
+            "id": id,
             "msg": data.get("message"),
             "zn": data.get("zakupka_number"),
             "st": data.get("status", "done")
