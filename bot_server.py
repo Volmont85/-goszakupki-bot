@@ -365,7 +365,7 @@ async def cleanup_null_records_loop():
     while True:
         try:
             async with SessionLocal() as session:
-                cutoff = datetime.utcnow() - timedelta(hours=48)
+                cutoff = datetime.utcnow() - timedelta(hours=2)
                 res = await session.execute(
                     text("""
                         DELETE FROM inbox
@@ -378,7 +378,7 @@ async def cleanup_null_records_loop():
                 print(f"[cleanup] Удалено {res.rowcount} пустых строк.")
         except Exception as e:
             print(f"[cleanup] Ошибка очистки NULL: {e}")
-        await asyncio.sleep(86400)
+        await asyncio.sleep(3600)
 
 # ================================================================
 # FASTAPI STARTUP
