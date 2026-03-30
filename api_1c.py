@@ -96,9 +96,9 @@ async def api_result(request: Request, api_key: str = Header(None)):
 
         # формируем текст уведомления
         if message == "удалена":
-            txt = "❌ Закупка удалена в 1С."
+            txt = "❌ Закупка удалена в 1С.в 1С:\n{zakupka_number}"
         elif message == "добавлена":
-            txt = f"✅ Закупка добавлена\n{zakupka_number} в 1С:\n{zakupka_number}"
+            txt = f"✅ Закупка добавлена\n{zakupka_number}"
         elif message== "уже создана":
             txt = f"⚠️ Статус обновлён - {zakupka_number}"
 
