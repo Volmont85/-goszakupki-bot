@@ -37,6 +37,7 @@ async def api_inbox(api_key: str = Header(None)):
                        zakupka_num, message, zakupka_number
                 FROM inbox
                 WHERE status = 'new'
+                  AND inn IS NOT NULL
             """))
             data = [dict(r._mapping) for r in res.fetchall()]
         return data
@@ -72,7 +73,6 @@ async def api_result(request: Request, api_key: str = Header(None)):
                        updated_at = NOW(),
                        status = :st
                  WHERE id = :id
-                   AND inn IS NOT NULL
             """),
             {
                 "id": id,
