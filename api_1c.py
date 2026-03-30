@@ -72,7 +72,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         # получаем telegram_id
         res = await session.execute(
             text("SELECT telegram_id FROM inbox WHERE id=:id"),
-            {"id": int(data.get("id"))}
+            {"id": id}
         )
         row = res.fetchone()
 
