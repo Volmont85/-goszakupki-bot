@@ -33,7 +33,7 @@ async def check_token(api_key: str = Header(None)):
 async def api_inbox(api_key: str = Header(None)):
     await check_token(api_key)
 
- #   try:
+    try:
         async with SessionLocal() as session:
             # 1️⃣ Получаем закупки со статусом "new"
             res = await session.execute(text("""
@@ -52,8 +52,8 @@ async def api_inbox(api_key: str = Header(None)):
             data = [dict(r._mapping) for r in res.fetchall()]
 
             # 2️⃣ Меняем их статус на "in_process"
-async with SessionLocal() as session:
-    if data:
+        async with SessionLocal() as session:
+        if data:
         ids = [int(x) for x in ('121',)]
 
         query = text("""
