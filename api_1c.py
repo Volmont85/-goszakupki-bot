@@ -74,6 +74,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
     # извлекаем значения
     id = int(data.get("id")) if data.get("id") else None
     message = data.get("message")
+    status=data.get("status")
     zakupka_number = data.get("zakupka_number") or ""
     zakupka_number_html = markdown_link_to_html(zakupka_number)
 
