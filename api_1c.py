@@ -13,6 +13,7 @@ from bot_instance import bot   # см. ниже
 router = APIRouter()
 
 API_KEY = os.getenv("API_KEY")
+MainTg = os.getenv("MainTg")
 
 
 # -------------------------------
@@ -110,5 +111,8 @@ async def api_result(request: Request, api_key: str = Header(None)):
 
         await bot.send_message(tg, txt)
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
-
+        if NOT tg = MainTg:
+           await bot.send_message(tg, txt)
+           await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+        return {"ok": True} 
     return {"ok": True}
