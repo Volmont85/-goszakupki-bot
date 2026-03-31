@@ -112,7 +112,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         await bot.send_message(tg, txt)
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
         if tg != MainTg:
-           await bot.send_message(tg, txt)
-           await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+           await bot.send_message(MainTg, txt)
+           await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
         return {"ok": True} 
     return {"ok": True}
