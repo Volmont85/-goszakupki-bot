@@ -34,6 +34,7 @@ async def api_inbox(api_key: str = Header(None)):
 
     try:
         async with SessionLocal() as session:
+            # 1️⃣ Получаем закупки со статусом "new"
             res = await session.execute(text("""
                 SELECT
                     id,
@@ -48,7 +49,24 @@ async def api_inbox(api_key: str = Header(None)):
                   AND inn IS NOT NULL
             """))
             data = [dict(r._mapping) for r in res.fetchall()]
+
+            # 2️⃣ Меняем их статус на "in_process"
+            if data:
+                ids = [str(d["id"]) for d in data]
+                await session.execute(
+                    text("""
+                        UPDATE inbox
+                        SET status = 'in_process',
+                            updated_at = :now
+                        WHERE id IN :ids
+                    """),
+                    {"now": datetime.utcnow().isoformat(), "ids": tuple(ids)}
+                )
+                await session.commit()
+
+        # 3️⃣ Возвращаем закупки (уже помеченные "in_process" в базе)
         return data
+
     except Exception as e:
         return {"error": str(e)}
 
@@ -68,41 +86,45 @@ def markdown_link_to_html(text: str) -> str:
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
-    
-   
-    
-    # извлекаем значения
-    id = int(data.get("id")) if data.get("id") else None
-    message = data.get("message")
-    status=data.get("status")
-    zakupka_number = data.get("zakupka_number") or ""
-    zakupka_number_html = markdown_link_to_html(zakupka_number)
 
+    # извлекаем значения
+    rec_id = int(data.get("id")) if data.get("id") else None
+    message = data.get("message") or ""
+    status = data.get("status") or ""            # ожидаем "done" или "delete"
+    zakupka_number = data.get("zakupka_number") or ""
+    zakupka_number_html = markdown_link_to_html(zakupka_number) if zakupka_number else None
 
     # если id отсутствует — ошибка
-    if id is None:
+    if rec_id is None:
         return {"error": "Missing id"}
 
-    async with SessionLocal() as session:
-        # обновление в таблице inbox
-        await session.execute(
-            text("""
-                UPDATE inbox
-                   SET message = :msg,
-                       zakupka_number = :zn,
-                       updated_at = NOW(),
-                       status = :st
-                 WHERE id = :id
-            """),
-            {
-                "id": id,
-                "msg": message,
-                "zn": zakupka_number,
-                "st": status
-            }
-        )
+    try:
+        async with SessionLocal() as session:
+            # 🔧 обновляем запись в таблице inbox
+            await session.execute(
+                text("""
+                    UPDATE inbox
+                       SET message = :msg,
+                           zakupka_number = :zn,
+                           updated_at = :now,
+                           status = :st
+                     WHERE id = :id
+                       AND status = 'in_process'
+                """),
+                {
+                    "id": rec_id,
+                    "msg": message,
+                    "zn": zakupka_number_html,
+                    "st": status,
+                    "now": datetime.utcnow().isoformat()
+                }
+            )
+            await session.commit()
 
-        await session.commit()
+        return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
         # получаем telegram_id
         res = await session.execute(
