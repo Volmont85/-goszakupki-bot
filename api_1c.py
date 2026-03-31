@@ -51,20 +51,20 @@ async def api_inbox(api_key: str = Header(None)):
             """))
             data = [dict(r._mapping) for r in res.fetchall()]
 
-            # 2️⃣ Меняем их статус на "in_process"
-        async with SessionLocal() as session:
+        # 2️⃣ Меняем их статус на "in_process"
         if data:
-        ids = [int(x) for x in ('121',)]
+            ids = [r["id"] for r in data]  # Берём реальные ID из выборки
 
-        query = text("""
-            UPDATE inbox
-               SET status = 'in_process',
-                   updated_at = :now
-             WHERE id = ANY(:ids)
-        """).bindparams(bindparam("ids", expanding=True))
+            async with SessionLocal() as session:
+                query = text("""
+                    UPDATE inbox
+                       SET status = 'in_process',
+                           updated_at = :now
+                     WHERE id = ANY(:ids)
+                """).bindparams(bindparam("ids", expanding=True))
 
-        await session.execute(query, {"now": datetime.utcnow(), "ids": ids})
-        await session.commit()
+                await session.execute(query, {"now": datetime.utcnow(), "ids": ids})
+                await session.commit()
 
         # 3️⃣ Возвращаем закупки (уже помеченные "in_process" в базе)
         return data
