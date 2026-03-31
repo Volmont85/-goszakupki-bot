@@ -34,7 +34,7 @@ async def api_inbox(api_key: str = Header(None)):
         async with SessionLocal() as session:
             res = await session.execute(text("""
                 SELECT id, telegram_id, inn, company_name,
-                       zakupka_num, message # , zakupka_number
+                       zakupka_num, message, zakupka_number
                 FROM inbox
                 WHERE status = 'new'
                   AND inn IS NOT NULL
