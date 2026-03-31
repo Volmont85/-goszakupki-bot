@@ -18,7 +18,7 @@ from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-from cleanup import delete_duplicates
+
 
 from database import engine
 from models import Base
@@ -381,35 +381,30 @@ async def cleanup_null_records_loop():
             print(f"[cleanup] Ошибка очистки NULL: {e}")
         await asyncio.sleep(3600)
 
-async def delete_duplicates():
-    """Удаляет дубликаты из таблицы inbox, оставляя самую старую запись."""
-    async with SessionLocal() as session:
-        sql = text("""
-            DELETE FROM inbox
-            WHERE id IN (
-                SELECT id FROM (
-                    SELECT id,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY inn, company_name, zakupka_num, telegram_id
-                            ORDER BY created_at ASC
-                        ) AS rn
-                    FROM inbox
-                ) t
-                WHERE t.rn > 1
-            )
-        """)
-        await session.execute(sql)
-        await session.commit()
-        print("✅ Дубликаты inbox удалены.")
-
-async def periodic_cleanup():
-    """Фоновая задача — каждые 5 минут чистит дубль."""
+async def cleanup_duplicates_loop():
+    """Фоновая задача: каждые 5 минут удаляет дубликаты из inbox."""
     while True:
         try:
-            await delete_duplicates()
+            async with SessionLocal() as session:
+                res = await session.execute(text("""
+                    DELETE FROM inbox
+                    WHERE id IN (
+                        SELECT id FROM (
+                            SELECT id,
+                                   ROW_NUMBER() OVER (
+                                       PARTITION BY inn, company_name, zakupka_num, telegram_id
+                                       ORDER BY created_at ASC
+                                   ) AS rn
+                            FROM inbox
+                        ) t
+                        WHERE t.rn > 1
+                    )
+                """))
+                await session.commit()
+                print(f"[cleanup] {datetime.utcnow():%Y-%m-%d %H:%M:%S} — удалено {res.rowcount} дублей.")
         except Exception as e:
-            print("Ошибка очистки:", e)
-        await asyncio.sleep(300)  # 300 секунд = 5 минут
+            print(f"[cleanup] Ошибка очистки дублей: {e}")
+        await asyncio.sleep(300)  # 5 минут
 
 
 # ================================================================
@@ -419,7 +414,7 @@ async def periodic_cleanup():
 async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
-    asyncio.create_task(periodic_cleanup())
+    asyncio.create_task(cleanup_duplicates_loop())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
