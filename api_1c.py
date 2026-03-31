@@ -121,12 +121,13 @@ async def api_result(request: Request, api_key: str = Header(None)):
                     "msg": message,
                     "zn": zakupka_number_html,
                     "st": status,
-                    "now": datetime.utcnow().isoformat()
+                    # ✅ Лучше использовать datetime.utcnow(), не isoformat()
+                    "now": datetime.utcnow()
                 }
             )
             await session.commit()
 
-            # 📩 Получаем telegram_id
+            # 📩 Получаем telegram_id после обновления
             res = await session.execute(
                 text("SELECT telegram_id FROM inbox WHERE id = :id"),
                 {"id": rec_id},
@@ -148,6 +149,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         else:
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
+        # ✅ Отправляем сообщения
         await bot.send_message(tg, txt, parse_mode="HTML")
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
 
