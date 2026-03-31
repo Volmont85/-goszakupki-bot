@@ -76,7 +76,8 @@ async def api_inbox(api_key: str = Header(None)):
 # -------------------------------
 
 def markdown_link_to_html(text: str) -> str:
-    if not isinstance(text, str):
+    """Преобразует Markdown-ссылку [text](url) в HTML"""
+    if not isinstance(text, str) or not text.strip():
         return ""
     pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
     return re.sub(pattern, r'<a href="\2">\1</a>', text)
@@ -87,20 +88,19 @@ async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
 
-    # извлекаем значения
+    # ✳️ Извлекаем значения
     rec_id = int(data.get("id")) if data.get("id") else None
-    message = data.get("message") or ""
-    status = data.get("status") or ""            # ожидаем "done" или "delete"
+    message = (data.get("message") or "").strip().lower()
+    status = (data.get("status") or "").strip()     # ожидаем 'done' или 'delete'
     zakupka_number = data.get("zakupka_number") or ""
-    zakupka_number_html = markdown_link_to_html(zakupka_number) if zakupka_number else None
+    zakupka_number_html = markdown_link_to_html(zakupka_number)
 
-    # если id отсутствует — ошибка
     if rec_id is None:
         return {"error": "Missing id"}
 
     try:
         async with SessionLocal() as session:
-            # 🔧 обновляем запись в таблице inbox
+            # 🔧 обновляем запись в inbox, только если она ещё в in_process
             await session.execute(
                 text("""
                     UPDATE inbox
@@ -121,33 +121,38 @@ async def api_result(request: Request, api_key: str = Header(None)):
             )
             await session.commit()
 
-        return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
+            # 📩 Получаем telegram_id
+            res = await session.execute(
+                text("SELECT telegram_id FROM inbox WHERE id = :id"),
+                {"id": rec_id},
+            )
+            row = res.fetchone()
 
-    except Exception as e:
-        return {"error": str(e)}
+        if not row or not row[0]:
+            return {"ok": True, "message": "Record updated, but no Telegram ID found"}
 
-        # получаем telegram_id
-        res = await session.execute(
-            text("SELECT telegram_id FROM inbox WHERE id=:id"),
-            {"id": id}
-        )
-        row = res.fetchone()
-
-    if row:
         tg = row[0]
 
-        # формируем текст уведомления
-        if message == "удалена":
+        # 📨 Формируем текст уведомления
+        if "удален" in message or status == "delete":
             txt = f"❌ Закупка удалена в 1С.\n{zakupka_number_html}"
-        elif message == "добавлена":
+        elif "добавлен" in message or status == "done":
             txt = f"✅ Закупка добавлена\n{zakupka_number_html}"
-        elif message== "уже создана":
-            txt = f"⚠️ Статус обновлён - {zakupka_number_html}"
+        elif "уже создан" in message:
+            txt = f"⚠️ Статус обновлён — {zakupka_number_html}"
+        else:
+            txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
         await bot.send_message(tg, txt, parse_mode="HTML")
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+
+        # 👀 Уведомляем также администратора
         if tg != MainTg:
-           await bot.send_message(MainTg, txt, parse_mode="HTML")
-           await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
-        return {"ok": True} 
-    return {"ok": True}
+            await bot.send_message(MainTg, txt, parse_mode="HTML")
+            await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
+
+        return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
+
+    except Exception as e:
+        # Ловим и возвращаем текст ошибки
+        return {"error": str(e)}
