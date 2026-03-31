@@ -380,6 +380,16 @@ async def cleanup_null_records_loop():
             print(f"[cleanup] Ошибка очистки NULL: {e}")
         await asyncio.sleep(3600)
 
+async def periodic_cleanup():
+    """Фоновая задача — каждые 5 минут чистит дубль."""
+    while True:
+        try:
+            await delete_duplicates()
+        except Exception as e:
+            print("Ошибка очистки:", e)
+        await asyncio.sleep(300)  # 300 секунд = 5 минут
+
+
 # ================================================================
 # FASTAPI STARTUP
 # ================================================================
@@ -387,6 +397,7 @@ async def cleanup_null_records_loop():
 async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
+        asyncio.create_task(periodic_cleanup())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
