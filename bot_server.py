@@ -413,7 +413,8 @@ async def reset_stuck_processes():
     while True:
         try:
             async with SessionLocal() as session:
-                ttl_limit = datetime.utcnow() - timedelta(minutes=10)
+                now = datetime.utcnow()
+                ttl_limit = now - timedelta(minutes=10)
 
                 await session.execute(
                     text("""
@@ -423,16 +424,13 @@ async def reset_stuck_processes():
                          WHERE status = 'in_process'
                            AND updated_at < :ttl
                     """),
-                    {
-                        "now": datetime.utcnow().isoformat(),
-                        "ttl": ttl_limit.isoformat()
-                    }
+                    {"now": now, "ttl": ttl_limit}
                 )
                 await session.commit()
+
         except Exception as e:
             print(f"[reset_stuck_processes] error: {e}")
 
-        # Проверка каждые 60 секунд
         await asyncio.sleep(60)
 # ================================================================
 # FASTAPI STARTUP
