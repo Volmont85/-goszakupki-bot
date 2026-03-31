@@ -7,6 +7,7 @@ import re
 from fastapi import APIRouter, Header, HTTPException, Request
 from sqlalchemy import text
 from datetime import datetime
+from sqlalchemy import bindparam
 from database import SessionLocal
 from models import Inbox
 from bot_instance import bot   # см. ниже
@@ -53,15 +54,16 @@ async def api_inbox(api_key: str = Header(None)):
             # 2️⃣ Меняем их статус на "in_process"
             if data:
                 ids = [str(d["id"]) for d in data]
-                await session.execute(
-                    text("""
-                        UPDATE inbox
-                        SET status = 'in_process',
-                            updated_at = :now
-                        WHERE id IN :ids
-                    """),
-                    {"now": datetime.utcnow().isoformat(), "ids": tuple(ids)}
-                )
+              ids = [int(x) for x in ('121',)]
+query = text("""
+    UPDATE inbox
+       SET status = 'in_process',
+           updated_at = :now
+     WHERE id = ANY(:ids)
+""").bindparams(bindparam("ids", expanding=True))
+
+await session.execute(query, {"now": datetime.utcnow(), "ids": ids})
+---
                 await session.commit()
 
         # 3️⃣ Возвращаем закупки (уже помеченные "in_process" в базе)
