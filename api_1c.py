@@ -55,15 +55,24 @@ async def api_inbox(api_key: str = Header(None)):
 # -------------------------------
 # POST /api/result
 # -------------------------------
+
+def markdown_link_to_html(text: str) -> str:
+    pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    return re.sub(pattern, r'<a href="\2">\1</a>', text)
+
 @router.post("/api/result")
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
-
+    
+    # Теперь этот текст уже с HTML-ссылкой
+    message = zakupka_number_html
+    
     # извлекаем значения
     id = int(data.get("id")) if data.get("id") else None
     message = data.get("message")
     zakupka_number = data.get("zakupka_number")
+    zakupka_number_html = markdown_link_to_html(zakupka_number)
     status = data.get("status")
 
     # если id отсутствует — ошибка
