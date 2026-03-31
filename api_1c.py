@@ -33,7 +33,7 @@ async def check_token(api_key: str = Header(None)):
 async def api_inbox(api_key: str = Header(None)):
     await check_token(api_key)
 
-    try:
+ #   try:
         async with SessionLocal() as session:
             # 1️⃣ Получаем закупки со статусом "new"
             res = await session.execute(text("""
