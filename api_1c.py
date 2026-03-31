@@ -58,23 +58,25 @@ async def api_inbox(api_key: str = Header(None)):
 # -------------------------------
 
 def markdown_link_to_html(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
     pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
     return re.sub(pattern, r'<a href="\2">\1</a>', text)
+
 
 @router.post("/api/result")
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
     data = await request.json()
     
-    # Теперь этот текст уже с HTML-ссылкой
-    message = zakupka_number_html
+   
     
     # извлекаем значения
     id = int(data.get("id")) if data.get("id") else None
     message = data.get("message")
-    zakupka_number = data.get("zakupka_number")
+    zakupka_number = data.get("zakupka_number") or ""
     zakupka_number_html = markdown_link_to_html(zakupka_number)
-    status = data.get("status")
+
 
     # если id отсутствует — ошибка
     if id is None:
@@ -113,11 +115,11 @@ async def api_result(request: Request, api_key: str = Header(None)):
 
         # формируем текст уведомления
         if message == "удалена":
-            txt = f"❌ Закупка удалена в 1С.\n{zakupka_number}"
+            txt = f"❌ Закупка удалена в 1С.\n{zakupka_number_html}"
         elif message == "добавлена":
-            txt = f"✅ Закупка добавлена\n{zakupka_number}"
+            txt = f"✅ Закупка добавлена\n{zakupka_number_html}"
         elif message== "уже создана":
-            txt = f"⚠️ Статус обновлён - {zakupka_number}"
+            txt = f"⚠️ Статус обновлён - {zakupka_number_html}"
 
         await bot.send_message(tg, txt, parse_mode="HTML")
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
