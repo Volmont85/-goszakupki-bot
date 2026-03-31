@@ -109,10 +109,10 @@ async def api_result(request: Request, api_key: str = Header(None)):
         elif message== "уже создана":
             txt = f"⚠️ Статус обновлён - {zakupka_number}"
 
-        await bot.send_message(tg, txt)
+        await bot.send_message(tg, txt, parse_mode="MarkdownV2")
         await bot.send_message(tg, "Для добавления новой закупки нажми /start")
         if tg != MainTg:
-           await bot.send_message(MainTg, txt)
+           await bot.send_message(MainTg, txt, parse_mode="MarkdownV2")
            await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
         return {"ok": True} 
     return {"ok": True}
