@@ -397,7 +397,7 @@ async def periodic_cleanup():
 async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
-        asyncio.create_task(periodic_cleanup())
+    asyncio.create_task(periodic_cleanup())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
