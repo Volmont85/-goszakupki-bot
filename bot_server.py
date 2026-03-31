@@ -18,6 +18,7 @@ from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
+from cleanup import delete_duplicates
 
 from database import engine
 from models import Base
