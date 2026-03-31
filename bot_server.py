@@ -405,8 +405,35 @@ async def cleanup_duplicates_loop():
         except Exception as e:
             print(f"[cleanup] Ошибка очистки дублей: {e}")
         await asyncio.sleep(300)  # 5 минут
+# ================================================================
+# Сброс статуса в inbox
+# ================================================================
 
+async def reset_stuck_processes():
+    while True:
+        try:
+            async with SessionLocal() as session:
+                ttl_limit = datetime.utcnow() - timedelta(minutes=10)
 
+                await session.execute(
+                    text("""
+                        UPDATE inbox
+                           SET status = 'new',
+                               updated_at = :now
+                         WHERE status = 'in_process'
+                           AND updated_at < :ttl
+                    """),
+                    {
+                        "now": datetime.utcnow().isoformat(),
+                        "ttl": ttl_limit.isoformat()
+                    }
+                )
+                await session.commit()
+        except Exception as e:
+            print(f"[reset_stuck_processes] error: {e}")
+
+        # Проверка каждые 60 секунд
+        await asyncio.sleep(60)
 # ================================================================
 # FASTAPI STARTUP
 # ================================================================
@@ -415,6 +442,7 @@ async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
+    asyncio.create_task(reset_stuck_processes())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
