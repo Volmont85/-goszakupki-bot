@@ -142,7 +142,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
             txt = f"❌ Закупка удалена в 1С.\n{zakupka_number_html}"
         elif "добавлен" in message or status == "done":
             txt = f"✅ Закупка добавлена\n{zakupka_number_html}"
-        elif "уже создан" in message:
+        elif "уже создана" in message:
             txt = f"⚠️ Статус обновлён — {zakupka_number_html}"
         else:
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
