@@ -122,14 +122,30 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         return
 
     # вставляем и получаем ID
-    async with SessionLocal() as session:
+   res = await session.execute(
+        text("""
+            SELECT id
+              FROM inbox
+             WHERE telegram_id = :tg
+               AND zakupka_num = :num
+             LIMIT 1
+        """),
+        {"tg": msg.from_user.id, "num": num},
+    )
+    existing = res.scalar_one_or_none()
+
+    if existing:
+        # ✅ Уже существует — возвращаем существующий ID
+        zakupka_id = existing
+    else:
+        # 🆕 Если нет — добавляем новую запись
         res = await session.execute(
             text("""
                 INSERT INTO inbox (telegram_id, zakupka_num)
                 VALUES (:tg, :num)
                 RETURNING id
             """),
-            {"tg": msg.from_user.id, "num": num}
+            {"tg": msg.from_user.id, "num": num},
         )
         zakupka_id = res.scalar_one()
         await session.commit()
