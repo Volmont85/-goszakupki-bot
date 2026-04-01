@@ -150,9 +150,14 @@ async def api_result(request: Request, api_key: str = Header(None)):
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
     recipients = {r for r in (tg, MainTg) if r}  # исключаем None и дубли
-    for chat_id in recipients:
-        await bot.send_message(chat_id, txt, parse_mode="HTML")
-        await bot.send_message(chat_id, "Для добавления новой закупки нажми /start")
+   # ✅ Отправляем пользователю, если он не MainTg
+if tg != MainTg:
+    await bot.send_message(tg, txt, parse_mode="HTML")
+    await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+
+# 👀 Уведомляем администратора (всегда)
+await bot.send_message(MainTg, txt, parse_mode="HTML")
+await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
 
     return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
