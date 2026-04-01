@@ -1,30 +1,27 @@
 # api_1c.py
 
 import os
+import re
 import secrets
 import json
-import re
-from fastapi import APIRouter, Header, HTTPException, Request
-from sqlalchemy import text
 from datetime import datetime
-from sqlalchemy import bindparam
+from fastapi import APIRouter, Header, HTTPException, Request
+from sqlalchemy import text, bindparam
 from database import SessionLocal
 from models import Inbox
-from bot_instance import bot   # см. ниже
+from bot_instance import bot  # импорт экземпляра бота
 
 router = APIRouter()
 
 API_KEY = os.getenv("API_KEY")
 MainTg = os.getenv("MainTg")
 
-
 # -------------------------------
-# Проверка API ключа
+# Проверка API‑ключа
 # -------------------------------
 async def check_token(api_key: str = Header(None)):
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
-
 
 # -------------------------------
 # GET /api/inbox
@@ -36,24 +33,26 @@ async def api_inbox(api_key: str = Header(None)):
     try:
         async with SessionLocal() as session:
             # 1️⃣ Получаем закупки со статусом "new"
-            res = await session.execute(text("""
-                SELECT
-                    id,
-                    telegram_id,
-                    inn,
-                    company_name,
-                    zakupka_num,
-                    message,
-                    NULL AS zakupka_number
-                FROM inbox
-                WHERE status = 'new'
-                  AND inn IS NOT NULL
-            """))
+            res = await session.execute(
+                text("""
+                    SELECT
+                        id,
+                        telegram_id,
+                        inn,
+                        company_name,
+                        zakupka_num,
+                        message,
+                        NULL AS zakupka_number
+                    FROM inbox
+                    WHERE status = 'new'
+                      AND inn IS NOT NULL
+                """)
+            )
             data = [dict(r._mapping) for r in res.fetchall()]
 
         # 2️⃣ Меняем их статус на "in_process"
         if data:
-            ids = [r["id"] for r in data]  # список из ID, тип [int, int, ...]
+            ids = [r["id"] for r in data]  # список ID‑шников
 
             async with SessionLocal() as session:
                 query = text("""
@@ -73,21 +72,21 @@ async def api_inbox(api_key: str = Header(None)):
         return data
 
     except Exception as e:
-        return {"error": str(e)}
-
+        return {"ok": False, "message": str(e)}
 
 # -------------------------------
-# POST /api/result
+# Вспомогательная функция
 # -------------------------------
-
 def markdown_link_to_html(text: str) -> str:
-    """Преобразует Markdown-ссылку [text](url) в HTML"""
+    """Преобразует Markdown‑ссылку [text](url) в HTML"""
     if not isinstance(text, str) or not text.strip():
         return ""
     pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
     return re.sub(pattern, r'<a href="\2">\1</a>', text)
 
-
+# -------------------------------
+# POST /api/result
+# -------------------------------
 @router.post("/api/result")
 async def api_result(request: Request, api_key: str = Header(None)):
     await check_token(api_key)
@@ -96,12 +95,12 @@ async def api_result(request: Request, api_key: str = Header(None)):
     # ✳️ Извлекаем значения
     rec_id = int(data.get("id")) if data.get("id") else None
     message = (data.get("message") or "").strip().lower()
-    status = (data.get("status") or "").strip()     # ожидаем 'done' или 'delete'
+    status = (data.get("status") or "").strip()      # ожидаем 'done' или 'delete'
     zakupka_number = data.get("zakupka_number") or ""
     zakupka_number_html = markdown_link_to_html(zakupka_number)
 
     if rec_id is None:
-        return {"error": "Missing id"}
+        return {"ok": False, "message": "Missing id"}
 
     try:
         async with SessionLocal() as session:
@@ -121,8 +120,8 @@ async def api_result(request: Request, api_key: str = Header(None)):
                     "msg": message,
                     "zn": zakupka_number_html,
                     "st": status,
-                    "now": datetime.utcnow(),  # ✅ Лучше использовать datetime.utcnow()
-                }
+                    "now": datetime.utcnow(),
+                },
             )
             await session.commit()
 
@@ -160,5 +159,4 @@ async def api_result(request: Request, api_key: str = Header(None)):
         return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
     except Exception as e:
-        # Ловим и возвращаем текст ошибки
-        return {"error": str(e)}
+        return {"ok": False, "message": str(e)}
