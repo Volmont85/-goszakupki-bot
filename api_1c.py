@@ -154,9 +154,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         await bot.send_message(chat_id, txt, parse_mode="HTML")
         await bot.send_message(chat_id, "Для добавления новой закупки нажми /start")
 
-
-
-return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
+    return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
 
     except Exception as e:
