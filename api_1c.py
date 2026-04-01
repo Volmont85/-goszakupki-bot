@@ -154,6 +154,7 @@ for chat_id in recipients:
     await bot.send_message(chat_id, txt, parse_mode="HTML")
     await bot.send_message(chat_id, "Для добавления новой закупки нажми /start")
 
+
 return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
 
