@@ -121,8 +121,8 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
         return
 
-    # вставляем и получаем ID
-   res = await session.execute(
+        # вставляем и получаем ID
+        res = await session.execute(
         text("""
             SELECT id
               FROM inbox
