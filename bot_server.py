@@ -451,7 +451,7 @@ async def reset_stuck_processes():
         try:
             async with SessionLocal() as session:
                 now = datetime.utcnow()
-                ttl_limit = now - timedelta(minutes=10)
+                ttl_limit = now - timedelta(minutes=5)
 
                 await session.execute(
                     text("""
