@@ -147,7 +147,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
         else:
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
-        recipients = {tg, MainTg}  # множество исключает дубли
+        recipients = {int(tg), int(MainTg)}  # множество исключает дубли
         for chat_id in recipients:
             await bot.send_message(chat_id, txt, parse_mode="HTML")
             await bot.send_message(chat_id, "Для добавления новой закупки нажми /start")
