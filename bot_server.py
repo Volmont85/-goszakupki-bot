@@ -114,95 +114,50 @@ async def start_cmd(msg: Message, state: FSMContext):
 # ================================================================
 # STAGE 1 — ЗАКУПКА
 # ================================================================
-from aiogram.types import Message
-from aiogram.fsm.context import FSMContext
-from sqlalchemy import text
-from database import SessionLocal
-from states import PurchaseStates  # убедись, что импорт существует
-from utils import validate_zakupka  # функция проверки номера закупки
-
-
+@dp.message(PurchaseStates.WAIT_ZAKUPKA)
 async def handle_zakupka(msg: Message, state: FSMContext):
     num = msg.text.strip()
-
-    # Проверяем номер закупки
     if not validate_zakupka(num):
-        await msg.answer(
-            "Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11."
-        )
+        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
         return
 
-    # ----------------------------
-    # Работа с базой: проверка существования записи
-    # ----------------------------
+    # вставляем и получаем ID
     async with SessionLocal() as session:
-
-        # 🔍 Проверяем, есть ли уже запись с таким telegram_id и zakupka_num
         res = await session.execute(
             text("""
-                SELECT id
-                  FROM inbox
-                 WHERE telegram_id = :tg
-                   AND zakupka_num = :num
-                 LIMIT 1
+                INSERT INTO inbox (telegram_id, zakupka_num)
+                VALUES (:tg, :num)
+                RETURNING id
             """),
-            {"tg": msg.from_user.id, "num": num},
+            {"tg": msg.from_user.id, "num": num}
         )
-        existing = res.scalar_one_or_none()
+        zakupka_id = res.scalar_one()
+        await session.commit()
 
-        if existing:
-            # ✅ Уже существует — возвращаем существующий ID
-            zakupka_id = existing
-        else:
-            # 🆕 Если нет — добавляем новую запись
-            res = await session.execute(
-                text("""
-                    INSERT INTO inbox (telegram_id, zakupka_num)
-                    VALUES (:tg, :num)
-                    RETURNING id
-                """),
-                {"tg": msg.from_user.id, "num": num},
-            )
-            zakupka_id = res.scalar_one()
-            await session.commit()
-
-    # ----------------------------
-    # Сохраняем данные в FSMContext
-    # ----------------------------
     await state.update_data(zakupka=num, zakupka_id=zakupka_id)
 
-    # ----------------------------
-    # Проверяем связанные компании пользователя
-    # ----------------------------
+    # проверяем связанные компании
     async with SessionLocal() as session:
         res = await session.execute(
-            text("SELECT inn, company_name FROM TelegramID WHERE telegram_id = :tg"),
+            text("SELECT inn, company_name FROM TelegramID WHERE telegram_id=:tg"),
             {"tg": msg.from_user.id},
         )
         rows = res.fetchall()
 
-    # ----------------------------
-    # В зависимости от количества найденных компаний — задаём следующее состояние
-    # ----------------------------
     if not rows:
         await msg.answer("Теперь пришли ИНН компании:")
         await state.set_state(PurchaseStates.WAIT_INN)
-
     elif len(rows) == 1:
         inn, name = rows[0]
         await msg.answer(f"Участвуем от «{name}» (ИНН {inn}) — всё верно?")
         await state.update_data(inn=inn, company_name=name)
         await state.set_state(PurchaseStates.CONFIRM_ONE)
-
     else:
-        companies_list = "\n".join(
-            [f"{i+1}. {company_name} (ИНН {inn})" for i, (inn, company_name) in enumerate(rows)]
-        )
-        await msg.answer(
-            f"Найдено несколько компаний:\n{companies_list}\n\nВведи номер или новый ИНН:"
-        )
+        companies = "\n".join([f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)])
+        await msg.answer(f"Найдено несколько компаний:\n{companies}\n\nВведи номер или новый ИНН:")
         await state.update_data(companies=rows)
         await state.set_state(PurchaseStates.CHOOSE_COMPANY)
+
 # ================================================================
 # STAGE 2 — ПОЛУЧЕНИЕ ИНН
 # ================================================================
