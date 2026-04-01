@@ -114,40 +114,26 @@ async def start_cmd(msg: Message, state: FSMContext):
 # ================================================================
 # STAGE 1 — ЗАКУПКА
 # ================================================================
-async with SessionLocal() as session:
+@dp.message(PurchaseStates.WAIT_ZAKUPKA)
+async def handle_zakupka(msg: Message, state: FSMContext):
+    num = msg.text.strip()
+    if not validate_zakupka(num):
+        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
+        return
 
-        # Сначала ищем запись с этим telegram_id и номером закупки
+    # вставляем и получаем ID
+    async with SessionLocal() as session:
         res = await session.execute(
             text("""
-                SELECT id
-                  FROM inbox
-                 WHERE telegram_id = :tg
-                   AND zakupka_num = :num
-                 LIMIT 1
+                INSERT INTO inbox (telegram_id, zakupka_num)
+                VALUES (:tg, :num)
+                RETURNING id
             """),
-            {"tg": msg.from_user.id, "num": num},
+            {"tg": msg.from_user.id, "num": num}
         )
-        existing_id = res.scalar_one_or_none()
+        zakupka_id = res.scalar_one()
+        await session.commit()
 
-        if existing_id is not None:
-            # ✅ Запись уже существует — используем её ID
-            zakupka_id = existing_id
-        else:
-            # 🆕 Нет записи — добавляем новую
-            res = await session.execute(
-                text("""
-                    INSERT INTO inbox (telegram_id, zakupka_num)
-                    VALUES (:tg, :num)
-                    RETURNING id
-                """),
-                {"tg": msg.from_user.id, "num": num},
-            )
-            zakupka_id = res.scalar_one()
-            await session.commit()
-
-    # ----------------------------
-    # Сохраняем данные в FSMContext
-    # ----------------------------
     await state.update_data(zakupka=num, zakupka_id=zakupka_id)
 
     # проверяем связанные компании
