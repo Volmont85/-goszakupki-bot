@@ -149,18 +149,16 @@ async def api_result(request: Request, api_key: str = Header(None)):
         else:
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
-    recipients = {r for r in (tg, MainTg) if r}  # исключаем None и дубли
-   # ✅ Отправляем пользователю, если он не MainTg
-if tg != MainTg:
-    await bot.send_message(tg, txt, parse_mode="HTML")
-    await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+        # ✅ Отправляем сообщения
+        await bot.send_message(tg, txt, parse_mode="HTML")
+        await bot.send_message(tg, "Для добавления новой закупки нажми /start")
 
-# 👀 Уведомляем администратора (всегда)
-await bot.send_message(MainTg, txt, parse_mode="HTML")
-await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
+        # 👀 Уведомляем также администратора
+        if not tg = MainTg:
+            await bot.send_message(MainTg, txt, parse_mode="HTML")
+            await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
 
-    return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
-
+        return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
     except Exception as e:
         # Ловим и возвращаем текст ошибки
