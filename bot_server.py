@@ -237,24 +237,52 @@ async def confirm_one(msg: Message, state: FSMContext):
     if msg.text.lower() in ("да", "ага"):
         data = await state.get_data()
         zakupka_id = data["zakupka_id"]
+        inn = data["inn"]
+        name = data["company_name"]
+        zakupka_num = data["zakupka"]
+
         async with SessionLocal() as session:
-                            res = await session.execute(
-                    text("SELECT 1 FROM inbox WHERE inn=:inn AND zakupka_num=:num"),
-                    {"inn": inn, "num": data["zakupka"]}
-                )
-                if res.scalar():
-                    await state.update_data(inn=inn, company_name=name)
-                    await msg.answer("⚠️ Такая закупка уже есть. Удалить?")
-                    await state.set_state(PurchaseStates.CONFIRM_DELETE)
-                    return
+            # 🔍 Проверяем — не заведена ли уже такая закупка ранее для этого ИНН
+            res = await session.execute(
+                text("""
+                    SELECT 1
+                      FROM inbox
+                     WHERE inn = :inn
+                       AND zakupka_num = :num
+                     LIMIT 1
+                """),
+                {"inn": inn, "num": zakupka_num},
+            )
+            already_exists = res.scalar()
+
+            if already_exists:
+                # ⚠️ Такая закупка уже есть — предложим удалить
+                await state.update_data(inn=inn, company_name=name)
+                await msg.answer("⚠️ Такая закупка уже заведена. Удалить?")
+                await state.set_state(PurchaseStates.CONFIRM_DELETE)
+                return
+
+            # ✅ Если нет дубликата — обновляем запись
             await session.execute(
-                text("UPDATE inbox SET inn=:inn, company_name=:nm WHERE id=:id"),
-                {"inn": data["inn"], "nm": data["company_name"], "id": zakupka_id},
+                text("""
+                    UPDATE inbox
+                       SET inn = :inn,
+                           company_name = :nm
+                     WHERE id = :id
+                """),
+                {"inn": inn, "nm": name, "id": zakupka_id},
             )
             await session.commit()
-        await msg.answer("✅ Заявка сохранена и передана на обработку в 1С. \nДля добавления новой закупки нажми /start")
+
+        # 💬 Ответ пользователю и очистка состояния
+        await msg.answer(
+            "✅ Заявка сохранена и передана на обработку в 1С.\n"
+            "Для добавления новой закупки нажми /start"
+        )
         await state.clear()
+
     else:
+        # Пользователь ответил не «да» — предлагаем новый ИНН
         await msg.answer("Ок, пришли новый ИНН:")
         await state.set_state(PurchaseStates.WAIT_INN)
 
