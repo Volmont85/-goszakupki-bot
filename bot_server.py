@@ -238,6 +238,15 @@ async def confirm_one(msg: Message, state: FSMContext):
         data = await state.get_data()
         zakupka_id = data["zakupka_id"]
         async with SessionLocal() as session:
+                            res = await session.execute(
+                    text("SELECT 1 FROM inbox WHERE inn=:inn AND zakupka_num=:num"),
+                    {"inn": inn, "num": data["zakupka"]}
+                )
+                if res.scalar():
+                    await state.update_data(inn=inn, company_name=name)
+                    await msg.answer("⚠️ Такая закупка уже есть. Удалить?")
+                    await state.set_state(PurchaseStates.CONFIRM_DELETE)
+                    return
             await session.execute(
                 text("UPDATE inbox SET inn=:inn, company_name=:nm WHERE id=:id"),
                 {"inn": data["inn"], "nm": data["company_name"], "id": zakupka_id},
