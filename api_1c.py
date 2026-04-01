@@ -121,8 +121,7 @@ async def api_result(request: Request, api_key: str = Header(None)):
                     "msg": message,
                     "zn": zakupka_number_html,
                     "st": status,
-                    # ✅ Лучше использовать datetime.utcnow(), не isoformat()
-                    "now": datetime.utcnow()
+                    "now": datetime.utcnow(),  # ✅ Лучше использовать datetime.utcnow()
                 }
             )
             await session.commit()
@@ -149,14 +148,14 @@ async def api_result(request: Request, api_key: str = Header(None)):
         else:
             txt = f"ℹ️ Статус обновлён: {message}\n{zakupka_number_html}"
 
-        # ✅ Отправляем сообщения
-        await bot.send_message(tg, txt, parse_mode="HTML")
-        await bot.send_message(tg, "Для добавления новой закупки нажми /start")
+        # ✅ Отправляем пользователю, если он не MainTg
+        if tg != MainTg:
+            await bot.send_message(tg, txt, parse_mode="HTML")
+            await bot.send_message(tg, "Для добавления новой закупки нажми /start")
 
-        # 👀 Уведомляем также администратора
-        if not tg = MainTg:
-            await bot.send_message(MainTg, txt, parse_mode="HTML")
-            await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
+        # 👀 Уведомляем администратора (всегда)
+        await bot.send_message(MainTg, txt, parse_mode="HTML")
+        await bot.send_message(MainTg, "Для добавления новой закупки нажми /start")
 
         return {"ok": True, "message": f"Record {rec_id} updated to status '{status}'"}
 
