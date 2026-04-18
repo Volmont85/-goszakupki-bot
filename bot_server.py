@@ -419,7 +419,7 @@ async def cleanup_null_records_loop():
         await asyncio.sleep(3600)
 
 async def cleanup_duplicates_loop():
-    """Фоновая задача: каждые 5 минут удаляет дубликаты из inbox."""
+    """Фоновая задача: каждые 15 минут удаляет дубликаты из inbox."""
     while True:
         try:
             async with SessionLocal() as session:
@@ -441,7 +441,7 @@ async def cleanup_duplicates_loop():
                 print(f"[cleanup] {datetime.utcnow():%Y-%m-%d %H:%M:%S} — удалено {res.rowcount} дублей.")
         except Exception as e:
             print(f"[cleanup] Ошибка очистки дублей: {e}")
-        await asyncio.sleep(300)  # 5 минут
+        await asyncio.sleep(900)  # 15 минут
 # ================================================================
 # Сброс статуса в inbox
 # ================================================================
