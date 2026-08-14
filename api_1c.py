@@ -100,27 +100,32 @@ async def receive_deadlines(request: Request, api_key: str = Header(None)):
                 except Exception:
                     continue
 
+                submitted = bool(item.get("submitted"))
+
                 await session.execute(
                     text("""
-                        INSERT INTO zakupka_deadlines (id1c, zakupka_num, zakazchik, deadline, updated_at)
-                        VALUES (:id1c, :num, :zak, :dl, :now)
+                        INSERT INTO zakupka_deadlines (id1c, zakupka_num, zakazchik, deadline, submitted, updated_at)
+                        VALUES (:id1c, :num, :zak, :dl, :sub, :now)
                         ON CONFLICT (id1c) DO UPDATE
-                           SET zakupka_num = EXCLUDED.zakupka_num,
-                               zakazchik = EXCLUDED.zakazchik,
-                               deadline = EXCLUDED.deadline,
-                               updated_at = EXCLUDED.updated_at
+                        SET zakupka_num = EXCLUDED.zakupka_num,
+                            zakazchik = EXCLUDED.zakazchik,
+                            deadline = EXCLUDED.deadline,
+                            submitted = zakupka_deadlines.submitted OR EXCLUDED.submitted,
+                            updated_at = EXCLUDED.updated_at
                     """),
                     {
                         "id1c": id1c,
                         "num": item.get("zakupka_num") or "",
                         "zak": item.get("zakazchik") or "",
                         "dl": deadline,
+                        "sub": submitted,
                         "now": datetime.utcnow(),
                     },
                 )
-                # submitted намеренно НЕ трогаем здесь на false — 1С присылает только
-                # неподанные закупки, но запись могла быть подтверждена ботом только что
-                # и ещё не долетело обратное подтверждение.
+                # submitted объединяем как "true побеждает" (см. SQL выше) - 1С теперь шлёт
+                # ВСЕ активные закупки (не только неподанные), это защищает от гонки, если
+                # заявку подтвердили кнопкой в боте, а 1С ещё не успела подтянуть это обратно
+                # через ИмпортПодтвержденийЗаявкаПодана.
                 saved += 1
             await session.commit()
 

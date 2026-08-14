@@ -445,6 +445,20 @@ async def cleanup_duplicates_loop():
         except Exception as e:
             print(f"[cleanup] Ошибка очистки дублей: {e}")
         await asyncio.sleep(900)  # 15 минут
+
+async def cleanup_old_deadlines_loop():
+    while True:
+        try:
+            async with SessionLocal() as session:
+                res = await session.execute(
+                    text("DELETE FROM zakupka_deadlines WHERE deadline < :dt"),
+                    {"dt": datetime.utcnow() - timedelta(days=60)}
+                )
+                await session.commit()
+                print(f"[cleanup] Старых дедлайнов удалено: {res.rowcount}")
+        except Exception as e:
+            print(f"[cleanup] Ошибка очистки дедлайнов: {e}")
+        await asyncio.sleep(86400)
 # ================================================================
 # НАПОМИНАНИЯ "ЗАЯВКА ПОДАНА" (интеграция с 1С)
 # ================================================================
@@ -581,6 +595,7 @@ async def startup_event():
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
+    asyncio.create_task(cleanup_old_deadlines_loop())
     asyncio.create_task(reset_stuck_processes())
     asyncio.create_task(deadline_reminder_loop())
     asyncio.create_task(dp.start_polling(bot))
