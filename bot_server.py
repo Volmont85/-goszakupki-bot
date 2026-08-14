@@ -5,6 +5,7 @@ import os
 import re
 import aiohttp
 import asyncio
+import zoneinfo
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -38,6 +39,8 @@ BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 DB_DSN = os.getenv("POSTGRES_DSN")
 API_KEY = os.getenv("API_KEY")
 PORT = int(os.environ.get("PORT", 443))
+MSK = zoneinfo.ZoneInfo("Europe/Moscow")
+MAIN_TG_CHAT_ID = os.getenv("MainTg")
 
 # ================================================================
 # FASTAPI APP
@@ -443,8 +446,108 @@ async def cleanup_duplicates_loop():
             print(f"[cleanup] Ошибка очистки дублей: {e}")
         await asyncio.sleep(900)  # 15 минут
 # ================================================================
+# НАПОМИНАНИЯ "ЗАЯВКА ПОДАНА" (интеграция с 1С)
+# ================================================================
+async def deadline_reminder_loop():
+    """В 17:00 МСК за день до дедлайна (и далее каждые 2 часа, пока нет ответа
+    "Да") шлёт вопрос с кнопками Да/Нет в MainTg."""
+    while True:
+        try:
+            now_msk = datetime.now(MSK)
+            if now_msk.hour >= 17 and MAIN_TG_CHAT_ID:
+                async with SessionLocal() as session:
+                    res = await session.execute(
+                        text("""
+                            SELECT id, zakupka_num, zakazchik, deadline, last_asked_at
+                              FROM zakupka_deadlines
+                             WHERE submitted = false
+                               AND confirmed_at IS NULL
+                        """)
+                    )
+                    rows = res.fetchall()
+
+                    for row_id, zakupka_num, zakazchik, deadline, last_asked_at in rows:
+                        deadline_msk = deadline.replace(tzinfo=MSK) if deadline.tzinfo is None else deadline.astimezone(MSK)
+                        if deadline_msk.date() != (now_msk + timedelta(days=1)).date():
+                            continue
+                        if last_asked_at and (now_msk.replace(tzinfo=None) - last_asked_at) < timedelta(hours=2):
+                            continue
+
+                        kb = InlineKeyboardMarkup(inline_keyboard=[[
+                            InlineKeyboardButton(text="Да", callback_data=f"zayavka_da_{row_id}"),
+                            InlineKeyboardButton(text="Нет", callback_data=f"zayavka_net_{row_id}"),
+                        ]])
+                        text_msg = (
+                            f"Заявка подана по закупке №{zakupka_num}"
+                            f"{' (' + zakazchik + ')' if zakazchik else ''}?\n"
+                            f"Дедлайн: {deadline_msk.strftime('%d.%m.%Y %H:%M')}"
+                        )
+                        await bot.send_message(int(MAIN_TG_CHAT_ID), text_msg, reply_markup=kb)
+
+                        await session.execute(
+                            text("""
+                                UPDATE zakupka_deadlines
+                                   SET last_asked_at = :now, ask_count = ask_count + 1
+                                 WHERE id = :id
+                            """),
+                            {"now": now_msk.replace(tzinfo=None), "id": row_id},
+                        )
+                    await session.commit()
+        except Exception as e:
+            print(f"[deadline_reminder_loop] error: {e}")
+        await asyncio.sleep(300)  # раз в 5 минут - ловит и 17:00, и повтор через 2ч
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("zayavka_"))
+async def handle_zayavka_answer(callback: CallbackQuery):
+    action, row_id = callback.data.rsplit("_", 1)
+    async with SessionLocal() as session:
+        row = (await session.execute(
+            text("SELECT id FROM zakupka_deadlines WHERE id = :id"),
+            {"id": int(row_id)},
+        )).fetchone()
+        if not row:
+            await callback.answer("Запись не найдена")
+            return
+
+        if action == "zayavka_da":
+            await session.execute(
+                text("UPDATE zakupka_deadlines SET submitted = true, confirmed_at = :now WHERE id = :id"),
+                {"now": datetime.utcnow(), "id": int(row_id)},
+            )
+            await session.commit()
+            await callback.message.edit_text(callback.message.text + "\n\n✅ Подтверждено: подана")
+        else:
+            await session.execute(
+                text("UPDATE zakupka_deadlines SET last_asked_at = :now WHERE id = :id"),
+                {"now": datetime.now(MSK).replace(tzinfo=None), "id": int(row_id)},
+            )
+            await session.commit()
+            await callback.message.edit_text(callback.message.text + "\n\n❌ Ещё не подана, спрошу через 2 часа")
+    await callback.answer()
+
+# ================================================================
 # Сброс статуса в inbox
 # ================================================================
+
+async def ensure_deadlines_table():
+    async with SessionLocal() as session:
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS zakupka_deadlines (
+                id SERIAL PRIMARY KEY,
+                id1c VARCHAR UNIQUE NOT NULL,
+                zakupka_num VARCHAR NOT NULL,
+                zakazchik VARCHAR,
+                deadline TIMESTAMP NOT NULL,
+                submitted BOOLEAN DEFAULT false,
+                last_asked_at TIMESTAMP,
+                ask_count INTEGER DEFAULT 0,
+                confirmed_at TIMESTAMP,
+                acked BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP DEFAULT now()
+            )
+        """))
+        await session.commit()
 
 async def reset_stuck_processes():
     while True:
@@ -474,10 +577,12 @@ async def reset_stuck_processes():
 # ================================================================
 @app.on_event("startup")
 async def startup_event():
+    await ensure_deadlines_table()
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
     asyncio.create_task(reset_stuck_processes())
+    asyncio.create_task(deadline_reminder_loop())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
