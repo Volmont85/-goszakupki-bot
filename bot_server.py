@@ -592,6 +592,34 @@ async def reset_stuck_processes():
 @app.on_event("startup")
 async def startup_event():
     await ensure_deadlines_table()
+
+    # --- ВРЕМЕННО (убрать после проверки) — разовая диагностика по
+    # закупке 0848300053826000262: есть ли запись/дедлайн, и форс-отправка
+    # тестового вопроса Да/Нет в MainTg, минуя окно 17:00/throttling.
+    async with SessionLocal() as _debug_session:
+        _debug_res = await _debug_session.execute(
+            text("SELECT * FROM zakupka_deadlines WHERE zakupka_num = :num ORDER BY updated_at DESC LIMIT 1"),
+            {"num": "0848300053826000262"},
+        )
+        _debug_row = _debug_res.mappings().first()
+        print(f"[DEBUG force_ask] zakupka_num=0848300053826000262 найдено: {dict(_debug_row) if _debug_row else None}")
+        if _debug_row and MAIN_TG_CHAT_ID:
+            _debug_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="Да", callback_data=f"zayavka_da_{_debug_row['id']}"),
+                InlineKeyboardButton(text="Нет", callback_data=f"zayavka_net_{_debug_row['id']}"),
+            ]])
+            _debug_deadline_str = _debug_row["deadline"].strftime("%d.%m.%Y %H:%M") if _debug_row["deadline"] else "не указан"
+            _debug_text = (
+                f"[ТЕСТ] Заявка подана по закупке №{_debug_row['zakupka_num']}"
+                f"{' (' + _debug_row['zakazchik'] + ')' if _debug_row['zakazchik'] else ''}?\n"
+                f"Дедлайн: {_debug_deadline_str}"
+            )
+            await bot.send_message(int(MAIN_TG_CHAT_ID), _debug_text, reply_markup=_debug_kb)
+            print("[DEBUG force_ask] тестовое сообщение отправлено в MainTg")
+        elif not _debug_row:
+            print("[DEBUG force_ask] записи с таким zakupka_num в БД нет")
+    # --- конец временного блока ---
+
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
