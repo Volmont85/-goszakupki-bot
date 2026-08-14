@@ -592,18 +592,6 @@ async def reset_stuck_processes():
 @app.on_event("startup")
 async def startup_event():
     await ensure_deadlines_table()
-
-    # --- ВРЕМЕННО (убрать после проверки) — повторная разовая проверка
-    # закупки 0848300053826000262: только чтение, БЕЗ отправки сообщений.
-    async with SessionLocal() as _debug_session:
-        _debug_res = await _debug_session.execute(
-            text("SELECT * FROM zakupka_deadlines WHERE zakupka_num = :num ORDER BY updated_at DESC LIMIT 1"),
-            {"num": "0848300053826000262"},
-        )
-        _debug_row = _debug_res.mappings().first()
-        print(f"[DEBUG check] zakupka_num=0848300053826000262 найдено: {dict(_debug_row) if _debug_row else None}")
-    # --- конец временного блока ---
-
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
