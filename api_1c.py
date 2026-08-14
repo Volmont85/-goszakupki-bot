@@ -75,6 +75,117 @@ async def api_inbox(api_key: str = Header(None)):
         return {"ok": False, "message": str(e)}
 
 # -------------------------------
+# POST /api/1c/deadlines
+# 1С шлёт список активных закупок (заявка не подана, дедлайн в будущем).
+# id1c — номер документа 1С, уникальный ключ.
+# -------------------------------
+@router.post("/api/1c/deadlines")
+async def receive_deadlines(request: Request, api_key: str = Header(None)):
+    await check_token(api_key)
+    payload = await request.json()
+
+    if not isinstance(payload, list):
+        return {"ok": False, "message": "Expected a JSON array"}
+
+    saved = 0
+    try:
+        async with SessionLocal() as session:
+            for item in payload:
+                id1c = str(item.get("id1c") or "").strip()
+                if not id1c:
+                    continue
+                try:
+                    # 1С шлёт дату через БезопасноеПреобразованиеJSON (ISO 'yyyy-MM-ddTHH:mm:ss')
+                    deadline = datetime.fromisoformat(str(item.get("deadline")))
+                except Exception:
+                    continue
+
+                submitted = bool(item.get("submitted"))
+
+                await session.execute(
+                    text("""
+                        INSERT INTO zakupka_deadlines (id1c, zakupka_num, zakazchik, deadline, submitted, updated_at)
+                        VALUES (:id1c, :num, :zak, :dl, :sub, :now)
+                        ON CONFLICT (id1c) DO UPDATE
+                        SET zakupka_num = EXCLUDED.zakupka_num,
+                            zakazchik = EXCLUDED.zakazchik,
+                            deadline = EXCLUDED.deadline,
+                            submitted = zakupka_deadlines.submitted OR EXCLUDED.submitted,
+                            updated_at = EXCLUDED.updated_at
+                    """),
+                    {
+                        "id1c": id1c,
+                        "num": item.get("zakupka_num") or "",
+                        "zak": item.get("zakazchik") or "",
+                        "dl": deadline,
+                        "sub": submitted,
+                        "now": datetime.utcnow(),
+                    },
+                )
+                # submitted объединяем как "true побеждает" (см. SQL выше) - 1С теперь шлёт
+                # ВСЕ активные закупки (не только неподанные), это защищает от гонки, если
+                # заявку подтвердили кнопкой в боте, а 1С ещё не успела подтянуть это обратно
+                # через ИмпортПодтвержденийЗаявкаПодана.
+                saved += 1
+            await session.commit()
+
+        return {"ok": True, "count": saved}
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
+# GET /api/1c/zayavka-confirmations
+# 1С забирает список неподтверждённых ей записей (confirmed_at не пусто, acked=false)
+# -------------------------------
+@router.get("/api/1c/zayavka-confirmations")
+async def get_confirmations(api_key: str = Header(None)):
+    await check_token(api_key)
+
+    try:
+        async with SessionLocal() as session:
+            res = await session.execute(
+                text("""
+                    SELECT id1c, zakupka_num
+                      FROM zakupka_deadlines
+                     WHERE confirmed_at IS NOT NULL
+                       AND acked = false
+                """)
+            )
+            return [dict(r._mapping) for r in res.fetchall()]
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
+# POST /api/1c/zayavka-confirmations/done
+# 1С подтверждает, что проставила ЗаявкаПодана=Истина по этим id1c — ставим acked=true.
+# -------------------------------
+@router.post("/api/1c/zayavka-confirmations/done")
+async def ack_confirmations(request: Request, api_key: str = Header(None)):
+    await check_token(api_key)
+    payload = await request.json()
+
+    if not isinstance(payload, list) or not payload:
+        return {"ok": True, "acked": 0}
+
+    try:
+        async with SessionLocal() as session:
+            query = text("""
+                UPDATE zakupka_deadlines
+                   SET acked = true
+                 WHERE id1c IN :ids
+            """).bindparams(bindparam("ids", expanding=True))
+
+            res = await session.execute(query, {"ids": [str(x) for x in payload]})
+            await session.commit()
+
+        return {"ok": True, "acked": res.rowcount}
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
 # Вспомогательная функция
 # -------------------------------
 def markdown_link_to_html(text: str) -> str:
