@@ -100,7 +100,10 @@ async def receive_deadlines(request: Request, api_key: str = Header(None)):
                 except Exception:
                     continue
 
-                submitted = bool(item.get("submitted"))
+                # 1С шлёт submitted как JSON-строку "true"/"false" (её сериализатор всё оборачивает в
+                # кавычки, булевых литералов не бывает) - bool("false") в Python тоже True, поэтому
+                # нужно сравнивать по значению строки, а не приводить к bool() напрямую.
+                submitted = str(item.get("submitted", "")).strip().lower() in ("true", "1")
 
                 await session.execute(
                     text("""
