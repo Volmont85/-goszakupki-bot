@@ -189,6 +189,50 @@ async def ack_confirmations(request: Request, api_key: str = Header(None)):
         return {"ok": False, "message": str(e)}
 
 # -------------------------------
+# GET /api/1c/debug/lookup — постоянный read-only эндпоинт для ручной
+# сверки конкретной закупки в zakupka_deadlines (без code-change/деплоя
+# на каждую проверку). Только SELECT, ничего не меняет.
+# -------------------------------
+@router.get("/api/1c/debug/lookup")
+async def debug_lookup_deadline(zakupka_num: str, api_key: str = Header(None)):
+    await check_token(api_key)
+
+    try:
+        async with SessionLocal() as session:
+            res = await session.execute(
+                text("""
+                    SELECT * FROM zakupka_deadlines
+                     WHERE zakupka_num = :num
+                     ORDER BY updated_at DESC
+                     LIMIT 1
+                """),
+                {"num": zakupka_num},
+            )
+            row = res.mappings().first()
+
+        if row is None:
+            return {"ok": True, "found": False}
+
+        return {
+            "ok": True,
+            "found": True,
+            "row": {
+                "id1c": row["id1c"],
+                "zakupka_num": row["zakupka_num"],
+                "zakazchik": row["zakazchik"],
+                "deadline": row["deadline"].isoformat() if row["deadline"] else None,
+                "submitted": row["submitted"],
+                "last_asked_at": row["last_asked_at"].isoformat() if row["last_asked_at"] else None,
+                "ask_count": row["ask_count"],
+                "confirmed_at": row["confirmed_at"].isoformat() if row["confirmed_at"] else None,
+                "acked": row["acked"],
+                "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+            },
+        }
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
 # Вспомогательная функция
 # -------------------------------
 def markdown_link_to_html(text: str) -> str:
