@@ -233,6 +233,118 @@ async def debug_lookup_deadline(zakupka_num: str, api_key: str = Header(None)):
         return {"ok": False, "message": str(e)}
 
 # -------------------------------
+# Правка (п.6): POST /api/1c/contract-signings
+# 1С шлёт список выигранных закупок с известным дедлайном подписания
+# (ДатаПодписанияПоставщиком), по аналогии с /api/1c/deadlines.
+# tz_note - необязательное текстовое пояснение от 1С (например, если
+# часовой пояс площадки отличается от МСК) - просто показывается в
+# уведомлении, на сам расчёт времени не влияет (все сроки в ЕИС и так
+# считаются по московскому времени).
+# -------------------------------
+@router.post("/api/1c/contract-signings")
+async def receive_contract_signings(request: Request, api_key: str = Header(None)):
+    await check_token(api_key)
+    payload = await request.json()
+
+    if not isinstance(payload, list):
+        return {"ok": False, "message": "Expected a JSON array"}
+
+    saved = 0
+    try:
+        async with SessionLocal() as session:
+            for item in payload:
+                id1c = str(item.get("id1c") or "").strip()
+                if not id1c:
+                    continue
+                try:
+                    deadline = datetime.fromisoformat(str(item.get("deadline")))
+                except Exception:
+                    continue
+
+                signed = str(item.get("signed", "")).strip().lower() in ("true", "1")
+
+                await session.execute(
+                    text("""
+                        INSERT INTO contract_signings (id1c, zakupka_num, zakazchik, deadline, tz_note, signed, updated_at)
+                        VALUES (:id1c, :num, :zak, :dl, :tz, :sig, :now)
+                        ON CONFLICT (id1c) DO UPDATE
+                        SET zakupka_num = EXCLUDED.zakupka_num,
+                            zakazchik = EXCLUDED.zakazchik,
+                            deadline = EXCLUDED.deadline,
+                            tz_note = EXCLUDED.tz_note,
+                            signed = contract_signings.signed OR EXCLUDED.signed,
+                            updated_at = EXCLUDED.updated_at
+                    """),
+                    {
+                        "id1c": id1c,
+                        "num": item.get("zakupka_num") or "",
+                        "zak": item.get("zakazchik") or "",
+                        "dl": deadline,
+                        "tz": item.get("tz_note") or None,
+                        "sig": signed,
+                        "now": datetime.utcnow(),
+                    },
+                )
+                saved += 1
+            await session.commit()
+
+        return {"ok": True, "count": saved}
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
+# Правка (п.6): GET /api/1c/signing-confirmations
+# 1С забирает список подтверждённых ей записей (confirmed_at не пусто, acked=false)
+# -------------------------------
+@router.get("/api/1c/signing-confirmations")
+async def get_signing_confirmations(api_key: str = Header(None)):
+    await check_token(api_key)
+
+    try:
+        async with SessionLocal() as session:
+            res = await session.execute(
+                text("""
+                    SELECT id1c, zakupka_num
+                      FROM contract_signings
+                     WHERE confirmed_at IS NOT NULL
+                       AND acked = false
+                """)
+            )
+            return [dict(r._mapping) for r in res.fetchall()]
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
+# Правка (п.6): POST /api/1c/signing-confirmations/done
+# 1С подтверждает, что проставила флаг подписания по этим id1c — ставим acked=true.
+# -------------------------------
+@router.post("/api/1c/signing-confirmations/done")
+async def ack_signing_confirmations(request: Request, api_key: str = Header(None)):
+    await check_token(api_key)
+    payload = await request.json()
+
+    if not isinstance(payload, list) or not payload:
+        return {"ok": True, "acked": 0}
+
+    try:
+        async with SessionLocal() as session:
+            query = text("""
+                UPDATE contract_signings
+                   SET acked = true
+                 WHERE id1c IN :ids
+            """).bindparams(bindparam("ids", expanding=True))
+
+            res = await session.execute(query, {"ids": [str(x) for x in payload]})
+            await session.commit()
+
+        return {"ok": True, "acked": res.rowcount}
+
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+# -------------------------------
 # Вспомогательная функция
 # -------------------------------
 def markdown_link_to_html(text: str) -> str:

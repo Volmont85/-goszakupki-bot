@@ -16,6 +16,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
@@ -111,7 +112,7 @@ async def get_company_name_by_inn(inn: str) -> str | None:
 # ================================================================
 @dp.message(Command("start"))
 async def start_cmd(msg: Message, state: FSMContext):
-    await msg.answer("👋 Привет! Пришли номер закупки (11 или 19 цифр):")
+    await msg.answer("👋 Привет! Пришли номер закупки (11 или 19 цифр):")
     await state.set_state(PurchaseStates.WAIT_ZAKUPKA)
 
 # ================================================================
@@ -121,7 +122,7 @@ async def start_cmd(msg: Message, state: FSMContext):
 async def handle_zakupka(msg: Message, state: FSMContext):
     num = msg.text.strip()
     if not validate_zakupka(num):
-        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
+        await msg.answer("Проверь номер закупки. Для 44‑ФЗ — 19 цифр, для 223‑ФЗ — 11.")
         return
 
     # вставляем и получаем ID
@@ -152,12 +153,12 @@ async def handle_zakupka(msg: Message, state: FSMContext):
         await state.set_state(PurchaseStates.WAIT_INN)
     elif len(rows) == 1:
         inn, name = rows[0]
-        await msg.answer(f"Участвуем от «{name}» (ИНН {inn}) — всё верно?")
+        await msg.answer(f"Участвуем от «{name}» (ИНН {inn}) — всё верно?")
         await state.update_data(inn=inn, company_name=name)
         await state.set_state(PurchaseStates.CONFIRM_ONE)
     else:
-        companies = "\n".join([f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)])
-        await msg.answer(f"Найдено несколько компаний:\n{companies}\n\nВведи номер или новый ИНН:")
+        companies = "\n".join([f"{i+1}. {r[1]} (ИНН {r[0]})" for i, r in enumerate(rows)])
+        await msg.answer(f"Найдено несколько компаний:\n{companies}\n\nВведи номер или новый ИНН:")
         await state.update_data(companies=rows)
         await state.set_state(PurchaseStates.CHOOSE_COMPANY)
 
@@ -168,7 +169,7 @@ async def handle_zakupka(msg: Message, state: FSMContext):
 async def handle_inn(msg: Message, state: FSMContext):
     inn = msg.text.strip()
     if not validate_inn(inn):
-        await msg.answer("⚠️ Проверь ИНН (10 или 12 цифр).")
+        await msg.answer("⚠️ Проверь ИНН (10 или 12 цифр).")
         return
 
     company = await get_company_name_by_inn(inn)
@@ -197,10 +198,10 @@ async def handle_inn(msg: Message, state: FSMContext):
             )
             await session.commit()
 
-        await msg.answer(f"✅ ИНН {inn} принадлежит «{company}».\nЗаявка сохранена.\nДля добавления новой закупки нажми /start")
+        await msg.answer(f"✅ ИНН {inn} принадлежит «{company}».\nЗаявка сохранена.\nДля добавления новой закупки нажми /start")
         await state.clear()
     else:
-        await msg.answer("⚠️ Компания не найдена. Пришли полное название (как в ЕГРЮЛ):")
+        await msg.answer("⚠️ Компания не найдена. Пришли полное название (как в ЕГРЮЛ):")
         await state.update_data(inn=inn)
         await state.set_state(PurchaseStates.WAIT_NAME)
 
@@ -229,7 +230,7 @@ async def handle_company_name(msg: Message, state: FSMContext):
         )
         await session.commit()
 
-    await msg.answer(f"✅ Компания «{company_name}» сохранена, ИНН {inn}. Заявка передана в 1С. \nДля добавления новой закупки нажми /start")
+    await msg.answer(f"✅ Компания «{company_name}» сохранена, ИНН {inn}. Заявка передана в 1С. \nДля добавления новой закупки нажми /start")
     await state.clear()
 
 # ================================================================
@@ -277,16 +278,16 @@ async def confirm_one(msg: Message, state: FSMContext):
             )
             await session.commit()
 
-        # 💬 Ответ пользователю и очистка состояния
+        # 💬 Ответ пользователю и очистка состояния
         await msg.answer(
-            "✅ Заявка сохранена и передана на обработку в 1С.\n"
+            "✅ Заявка сохранена и передана на обработку в 1С.\n"
             "Для добавления новой закупки нажми /start"
         )
         await state.clear()
 
     else:
         # Пользователь ответил не «да» — предлагаем новый ИНН
-        await msg.answer("Ок, пришли новый ИНН:")
+        await msg.answer("Ок, пришли новый ИНН:")
         await state.set_state(PurchaseStates.WAIT_INN)
 
 # ================================================================
@@ -332,7 +333,7 @@ async def choose_company(msg: Message, state: FSMContext):
                 )
                 await session.commit()
 
-            await msg.answer(f"✅ Выбрана компания: «{name}» (ИНН {inn}). Заявка сохранена. \nДля добавления новой закупки нажми /start")
+            await msg.answer(f"✅ Выбрана компания: «{name}» (ИНН {inn}). Заявка сохранена. \nДля добавления новой закупки нажми /start")
             await state.clear()
             return
 
@@ -341,7 +342,7 @@ async def choose_company(msg: Message, state: FSMContext):
         return
 
     # 3️⃣ Если это не число вообще
-    await msg.answer("⚠️ Введи номер компании из списка или ИНН (10 или 12 цифр).")
+    await msg.answer("⚠️ Введи номер компании из списка или ИНН (10 или 12 цифр).")
 
 # ================================================================
 # CONFIRM DELETE
@@ -369,7 +370,7 @@ async def confirm_delete(msg: Message, state: FSMContext):
                 await msg.answer("⚠️ Не нашёл закупку с этим ИНН и номером закупки.")
                 await state.clear()
                 return
-            
+
             # обновляем нужную запись
             await session.execute(
                 text("UPDATE inbox SET message='отказались', status='new' WHERE inn=:inn AND zakupka_num=:num"),
@@ -459,12 +460,47 @@ async def cleanup_old_deadlines_loop():
         except Exception as e:
             print(f"[cleanup] Ошибка очистки дедлайнов: {e}")
         await asyncio.sleep(86400)
+
+async def cleanup_old_signings_loop():
+    """Правка (п.5/6): аналогичная чистка для новой таблицы contract_signings."""
+    while True:
+        try:
+            async with SessionLocal() as session:
+                res = await session.execute(
+                    text("DELETE FROM contract_signings WHERE deadline < :dt"),
+                    {"dt": datetime.utcnow() - timedelta(days=60)}
+                )
+                await session.commit()
+                print(f"[cleanup] Старых записей о подписании удалено: {res.rowcount}")
+        except Exception as e:
+            print(f"[cleanup] Ошибка очистки contract_signings: {e}")
+        await asyncio.sleep(86400)
+
+# ================================================================
+# Правка (п.5): безопасное удаление предыдущего сообщения-напоминания
+# ================================================================
+async def delete_previous_reminder(chat_id: int, message_id: int | None):
+    """Best-effort удаление старого сообщения-напоминания перед отправкой нового
+    по той же закупке/контракту. Если сообщение уже удалено пользователем или
+    Telegram не даёт его удалить (например, прошло >48ч) - просто игнорируем,
+    это не должно останавливать отправку нового напоминания."""
+    if not message_id:
+        return
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except TelegramBadRequest:
+        pass
+    except Exception as e:
+        print(f"[delete_previous_reminder] error: {e}")
+
 # ================================================================
 # НАПОМИНАНИЯ "ЗАЯВКА ПОДАНА" (интеграция с 1С)
 # ================================================================
 async def deadline_reminder_loop():
     """В 17:00 МСК за день до дедлайна (и далее каждые 2 часа, пока нет ответа
-    "Да") шлёт вопрос с кнопками Да/Нет в MainTg."""
+    "Да") шлёт вопрос с кнопками Да/Нет в MainTg. Правка (п.5): при повторном
+    напоминании по той же закупке старое сообщение удаляется, чтобы в чате не
+    копились дубли."""
     while True:
         try:
             now_msk = datetime.now(MSK)
@@ -472,7 +508,7 @@ async def deadline_reminder_loop():
                 async with SessionLocal() as session:
                     res = await session.execute(
                         text("""
-                            SELECT id, zakupka_num, zakazchik, deadline, last_asked_at
+                            SELECT id, zakupka_num, zakazchik, deadline, last_asked_at, last_message_id
                               FROM zakupka_deadlines
                              WHERE submitted = false
                                AND confirmed_at IS NULL
@@ -480,7 +516,7 @@ async def deadline_reminder_loop():
                     )
                     rows = res.fetchall()
 
-                    for row_id, zakupka_num, zakazchik, deadline, last_asked_at in rows:
+                    for row_id, zakupka_num, zakazchik, deadline, last_asked_at, last_message_id in rows:
                         deadline_msk = deadline.replace(tzinfo=MSK) if deadline.tzinfo is None else deadline.astimezone(MSK)
                         if deadline_msk.date() != (now_msk + timedelta(days=1)).date():
                             continue
@@ -496,15 +532,19 @@ async def deadline_reminder_loop():
                             f"{' (' + zakazchik + ')' if zakazchik else ''}?\n"
                             f"Дедлайн: {deadline_msk.strftime('%d.%m.%Y %H:%M')}"
                         )
-                        await bot.send_message(int(MAIN_TG_CHAT_ID), text_msg, reply_markup=kb)
+
+                        # Правка (п.5): убираем предыдущее напоминание по этой же закупке
+                        await delete_previous_reminder(int(MAIN_TG_CHAT_ID), last_message_id)
+
+                        sent = await bot.send_message(int(MAIN_TG_CHAT_ID), text_msg, reply_markup=kb)
 
                         await session.execute(
                             text("""
                                 UPDATE zakupka_deadlines
-                                   SET last_asked_at = :now, ask_count = ask_count + 1
+                                   SET last_asked_at = :now, ask_count = ask_count + 1, last_message_id = :mid
                                  WHERE id = :id
                             """),
-                            {"now": now_msk.replace(tzinfo=None), "id": row_id},
+                            {"now": now_msk.replace(tzinfo=None), "id": row_id, "mid": sent.message_id},
                         )
                     await session.commit()
         except Exception as e:
@@ -540,6 +580,118 @@ async def handle_zayavka_answer(callback: CallbackQuery):
     await callback.answer()
 
 # ================================================================
+# Правка (п.6): НАПОМИНАНИЯ "КОНТРАКТ ПОДПИСАН?" (по аналогии с "Заявка
+# подана", но с другой частотой в последние 2 часа перед дедлайном).
+#
+# Дедлайн подписания в 1С - поле ДатаПодписанияПоставщиком (дата без
+# времени). По умолчанию считаем время окончания 23:59 МСК - все сроки в
+# ЕИС по 44-ФЗ/223-ФЗ считаются по московскому времени независимо от
+# часового пояса поставщика/заказчика (проверено), поэтому реального
+# сдвига часов не делаем - только поясняющая пометка в тексте, если 1С
+# передаёт часовой пояс площадки, отличный от 3 (МСК).
+# ================================================================
+async def contract_signing_reminder_loop():
+    """Обычный режим: каждые 2 часа начиная с 17:00 МСК. Особый режим: за 2
+    часа до дедлайна подписания и до самого дедлайна - каждые 15 минут,
+    независимо от времени суток."""
+    while True:
+        try:
+            now_msk = datetime.now(MSK)
+            if MAIN_TG_CHAT_ID:
+                async with SessionLocal() as session:
+                    res = await session.execute(
+                        text("""
+                            SELECT id, zakupka_num, zakazchik, deadline, last_asked_at,
+                                   last_message_id, tz_note
+                              FROM contract_signings
+                             WHERE signed = false
+                               AND confirmed_at IS NULL
+                        """)
+                    )
+                    rows = res.fetchall()
+
+                    for row_id, zakupka_num, zakazchik, deadline, last_asked_at, last_message_id, tz_note in rows:
+                        deadline_msk = deadline.replace(tzinfo=MSK) if deadline.tzinfo is None else deadline.astimezone(MSK)
+
+                        time_left = deadline_msk - now_msk
+                        if time_left.total_seconds() < 0:
+                            # дедлайн прошёл, а ответа так и не было - продолжаем спрашивать
+                            # каждые 15 минут, пока не подтвердят (лучше перебдеть)
+                            urgent = True
+                        else:
+                            urgent = time_left <= timedelta(hours=2)
+
+                        if urgent:
+                            min_gap = timedelta(minutes=15)
+                        else:
+                            if now_msk.hour < 17:
+                                continue
+                            min_gap = timedelta(hours=2)
+
+                        if last_asked_at and (now_msk.replace(tzinfo=None) - last_asked_at) < min_gap:
+                            continue
+
+                        kb = InlineKeyboardMarkup(inline_keyboard=[[
+                            InlineKeyboardButton(text="Да", callback_data=f"podpisan_da_{row_id}"),
+                            InlineKeyboardButton(text="Нет", callback_data=f"podpisan_net_{row_id}"),
+                        ]])
+                        tz_line = f"\n⚠️ {tz_note}" if tz_note else ""
+                        text_msg = (
+                            f"Контракт подписан по закупке №{zakupka_num}"
+                            f"{' (' + zakazchik + ')' if zakazchik else ''}?\n"
+                            f"Дедлайн подписания: {deadline_msk.strftime('%d.%m.%Y %H:%M')} МСК"
+                            f"{tz_line}"
+                        )
+
+                        # Правка (п.5): убираем предыдущее напоминание по этой же закупке
+                        await delete_previous_reminder(int(MAIN_TG_CHAT_ID), last_message_id)
+
+                        sent = await bot.send_message(int(MAIN_TG_CHAT_ID), text_msg, reply_markup=kb)
+
+                        await session.execute(
+                            text("""
+                                UPDATE contract_signings
+                                   SET last_asked_at = :now, ask_count = ask_count + 1, last_message_id = :mid
+                                 WHERE id = :id
+                            """),
+                            {"now": now_msk.replace(tzinfo=None), "id": row_id, "mid": sent.message_id},
+                        )
+                    await session.commit()
+        except Exception as e:
+            print(f"[contract_signing_reminder_loop] error: {e}")
+        # Правка: проверяем каждые 5 минут - этого достаточно, чтобы не
+        # пропустить ни обычный 2-часовой интервал, ни срочный 15-минутный.
+        await asyncio.sleep(300)
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("podpisan_"))
+async def handle_podpisan_answer(callback: CallbackQuery):
+    action, row_id = callback.data.rsplit("_", 1)
+    async with SessionLocal() as session:
+        row = (await session.execute(
+            text("SELECT id FROM contract_signings WHERE id = :id"),
+            {"id": int(row_id)},
+        )).fetchone()
+        if not row:
+            await callback.answer("Запись не найдена")
+            return
+
+        if action == "podpisan_da":
+            await session.execute(
+                text("UPDATE contract_signings SET signed = true, confirmed_at = :now WHERE id = :id"),
+                {"now": datetime.utcnow(), "id": int(row_id)},
+            )
+            await session.commit()
+            await callback.message.edit_text(callback.message.text + "\n\n✅ Подтверждено: подписан")
+        else:
+            await session.execute(
+                text("UPDATE contract_signings SET last_asked_at = :now WHERE id = :id"),
+                {"now": datetime.now(MSK).replace(tzinfo=None), "id": int(row_id)},
+            )
+            await session.commit()
+            await callback.message.edit_text(callback.message.text + "\n\n❌ Ещё не подписан, спрошу позже")
+    await callback.answer()
+
+# ================================================================
 # Сброс статуса в inbox
 # ================================================================
 
@@ -557,6 +709,35 @@ async def ensure_deadlines_table():
                 ask_count INTEGER DEFAULT 0,
                 confirmed_at TIMESTAMP,
                 acked BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP DEFAULT now()
+            )
+        """))
+        # Правка (п.5): добавляем колонку в уже существующую таблицу - ADD COLUMN
+        # IF NOT EXISTS безопасен и для новой, и для уже заполненной таблицы.
+        await session.execute(text("""
+            ALTER TABLE zakupka_deadlines ADD COLUMN IF NOT EXISTS last_message_id BIGINT
+        """))
+        await session.commit()
+
+async def ensure_signings_table():
+    """Правка (п.6): новая таблица для напоминаний "контракт подписан?",
+    по структуре аналогична zakupka_deadlines."""
+    async with SessionLocal() as session:
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS contract_signings (
+                id SERIAL PRIMARY KEY,
+                id1c VARCHAR UNIQUE NOT NULL,
+                zakupka_num VARCHAR NOT NULL,
+                zakazchik VARCHAR,
+                deadline TIMESTAMP NOT NULL,
+                tz_note VARCHAR,
+                signed BOOLEAN DEFAULT false,
+                last_asked_at TIMESTAMP,
+                ask_count INTEGER DEFAULT 0,
+                confirmed_at TIMESTAMP,
+                acked BOOLEAN DEFAULT false,
+                last_message_id BIGINT,
                 created_at TIMESTAMP DEFAULT now(),
                 updated_at TIMESTAMP DEFAULT now()
             )
@@ -592,12 +773,15 @@ async def reset_stuck_processes():
 @app.on_event("startup")
 async def startup_event():
     await ensure_deadlines_table()
+    await ensure_signings_table()
     asyncio.create_task(cleanup_old_records_loop())
     asyncio.create_task(cleanup_null_records_loop())
     asyncio.create_task(cleanup_duplicates_loop())
     asyncio.create_task(cleanup_old_deadlines_loop())
+    asyncio.create_task(cleanup_old_signings_loop())
     asyncio.create_task(reset_stuck_processes())
     asyncio.create_task(deadline_reminder_loop())
+    asyncio.create_task(contract_signing_reminder_loop())
     asyncio.create_task(dp.start_polling(bot))
     print("[startup] Bot polling + cleanup started")
 
