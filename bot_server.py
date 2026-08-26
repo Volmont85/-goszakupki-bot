@@ -591,12 +591,16 @@ async def handle_zayavka_answer(callback: CallbackQuery):
 # передаёт часовой пояс площадки, отличный от 3 (МСК).
 # ================================================================
 async def contract_signing_reminder_loop():
-    """Обычный режим: каждые 2 часа начиная с 17:00 МСК. Особый режим: за 2
-    часа до дедлайна подписания и до самого дедлайна - каждые 15 минут,
-    независимо от времени суток."""
+    """Правка по уточнению: уведомления НЕ каждый день, а только:
+    1) контрольная проверка за 1 день до дедлайна, один раз в 17:00 МСК;
+    2) если на неё не ответили "Да" - в сам день дедлайна включается обычный
+       режим по ТЗ (каждые 2 часа начиная с 17:00, а в последние 2 часа перед
+       дедлайном и после его наступления, пока нет ответа - каждые 15 минут).
+    В остальные дни (раньше, чем за день до дедлайна) уведомлений нет вовсе."""
     while True:
         try:
             now_msk = datetime.now(MSK)
+            today_msk = now_msk.date()
             if MAIN_TG_CHAT_ID:
                 async with SessionLocal() as session:
                     res = await session.execute(
@@ -612,23 +616,29 @@ async def contract_signing_reminder_loop():
 
                     for row_id, zakupka_num, zakazchik, deadline, last_asked_at, last_message_id, tz_note in rows:
                         deadline_msk = deadline.replace(tzinfo=MSK) if deadline.tzinfo is None else deadline.astimezone(MSK)
-
+                        days_until = (deadline_msk.date() - today_msk).days
                         time_left = deadline_msk - now_msk
-                        if time_left.total_seconds() < 0:
-                            # дедлайн прошёл, а ответа так и не было - продолжаем спрашивать
-                            # каждые 15 минут, пока не подтвердят (лучше перебдеть)
-                            urgent = True
-                        else:
-                            urgent = time_left <= timedelta(hours=2)
 
-                        if urgent:
-                            min_gap = timedelta(minutes=15)
-                        else:
-                            if now_msk.hour < 17:
+                        if days_until == 1:
+                            # Контрольная проверка - ровно один раз, в 17:00 МСК за день до дедлайна.
+                            if now_msk.hour != 17:
                                 continue
-                            min_gap = timedelta(hours=2)
-
-                        if last_asked_at and (now_msk.replace(tzinfo=None) - last_asked_at) < min_gap:
+                            if last_asked_at and last_asked_at.date() == today_msk:
+                                continue
+                        elif days_until <= 0:
+                            # День дедлайна (или дедлайн уже прошёл, а ответа нет) - обычный режим
+                            # по ТЗ: каждые 2 часа с 17:00, в последние 2 часа - каждые 15 минут.
+                            urgent = time_left.total_seconds() < 0 or time_left <= timedelta(hours=2)
+                            if urgent:
+                                min_gap = timedelta(minutes=15)
+                            else:
+                                if now_msk.hour < 17:
+                                    continue
+                                min_gap = timedelta(hours=2)
+                            if last_asked_at and (now_msk.replace(tzinfo=None) - last_asked_at) < min_gap:
+                                continue
+                        else:
+                            # До дедлайна больше 1 дня - молчим, ещё рано.
                             continue
 
                         kb = InlineKeyboardMarkup(inline_keyboard=[[
